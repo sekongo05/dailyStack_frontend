@@ -1,0 +1,110 @@
+import 'package:dio/dio.dart';
+import '../../../core/network/api_response.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/storage/local_database.dart';
+import '../models/auth_models.dart';
+
+class AuthService {
+  final DioClient _client;
+  final LocalDatabase? _localDb;
+
+  AuthService(this._client, {LocalDatabase? localDb}) : _localDb = localDb;
+
+  Future<AuthResponse> register({
+    required String email,
+    required String password,
+    required String username,
+  }) async {
+    try {
+      final response = await _client.dio.post(
+        '/auth/register',
+        data: {'email': email, 'password': password, 'username': username},
+      );
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => AuthResponse.fromJson(data as Map<String, dynamic>),
+      );
+      final auth = apiRes.data!;
+      await _saveTokens(auth);
+      return auth;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
+  Future<AuthResponse> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _client.dio.post(
+        '/auth/login',
+        data: {'email': email, 'password': password},
+      );
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => AuthResponse.fromJson(data as Map<String, dynamic>),
+      );
+      final auth = apiRes.data!;
+      await _saveTokens(auth);
+      return auth;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
+  Future<UserProfile> getMe() async {
+    try {
+      final response = await _client.dio.get('/users/me');
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => UserProfile.fromJson(data as Map<String, dynamic>),
+      );
+      return apiRes.data!;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
+  Future<UserPreferences> getPreferences() async {
+    try {
+      final response = await _client.dio.get('/users/me/preferences');
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => UserPreferences.fromJson(data as Map<String, dynamic>),
+      );
+      return apiRes.data!;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
+  Future<UserPreferences> updatePreferences(Map<String, dynamic> payload) async {
+    try {
+      final response = await _client.dio.put('/users/me/preferences', data: payload);
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => UserPreferences.fromJson(data as Map<String, dynamic>),
+      );
+      return apiRes.data!;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
+  Future<void> logout() async {
+    await _client.storage.deleteAll();
+    await _localDb?.clearAll();
+  }
+
+  Future<bool> hasStoredSession() async {
+    final token = await _client.storage.read(key: 'accessToken');
+    return token != null && token.isNotEmpty;
+  }
+
+  Future<void> _saveTokens(AuthResponse auth) async {
+    await _client.storage.write(key: 'accessToken', value: auth.accessToken);
+    await _client.storage.write(key: 'refreshToken', value: auth.refreshToken);
+  }
+}
+
