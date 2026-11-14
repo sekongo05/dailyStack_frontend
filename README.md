@@ -1,93 +1,108 @@
-# dailyStack_frontend
+<div align="center">
+  <img src="dailystack/assets/images/app_logo.png" alt="DailyStack Logo" width="88" />
+  <h1>DailyStack — Frontend Flutter</h1>
+  <p>Application de micro-apprentissage quotidien dédiée au <strong>Backend</strong>, au <strong>DevOps</strong> et à la <strong>veille IA</strong>.</p>
+</div>
 
+---
 
+## Fonctionnalités
 
-## Getting started
+- **Accueil & Leçon du jour** : tableau de bord quotidien avec série (*streak*), indicateurs de progression, révisions dues et aperçu des actualités tech.
+- **Parcours d'apprentissage** : modules filtrables par domaine (*Backend*, *DevOps*) et par niveau (`1` à `5`), lecture continue en Markdown avec sauvegarde et restauration automatique de la position de lecture.
+- **Pratique & Révision espacée** : exercices interactifs avec feedback immédiat, niveaux de maîtrise (*Découverte*, *À consolider*, *Maîtrisée*) et suivi des notions.
+- **Veille technologique** : actualités classées par catégorie (*Backend*, *DevOps*, *IA*, *Tech Émergente*) et niveau d'importance, recherche par mot-clé, favoris et fiche détaillée.
+- **Notifications in-app** : historique des rappels quotidiens avec marquage comme lu et redirection directe vers la leçon concernée.
+- **Profil & Accessibilité** : thème clair / sombre / système, échelle typographique personnalisable et préférences de rappels.
+- **Mode hors ligne** : mise en cache SQLite locale et file d'attente de synchronisation automatique dès le retour de la connectivité.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+---
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Stack technique
 
-## Add your files
+- **Framework** : Flutter (Dart SDK `^3.13.7`)
+- **Gestion d'état** : [`flutter_riverpod`](https://pub.dev/packages/flutter_riverpod)
+- **Navigation** : [`go_router`](https://pub.dev/packages/go_router)
+- **Réseau & Sécurité** : [`dio`](https://pub.dev/packages/dio) (intercepteur JWT avec file d'attente de rafraîchissement), [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage)
+- **Persistance & Sync hors ligne** : [`sqflite`](https://pub.dev/packages/sqflite), [`connectivity_plus`](https://pub.dev/packages/connectivity_plus)
+- **Interface & Contenu** : [`google_fonts`](https://pub.dev/packages/google_fonts) (*Plus Jakarta Sans*), [`flutter_markdown`](https://pub.dev/packages/flutter_markdown)
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+---
 
+## Architecture du code
+
+```text
+dailystack/
+├── assets/images/app_logo.png
+├── lib/
+│   ├── main.dart
+│   ├── core/
+│   │   ├── config/          # Configuration d'environnement API (ApiConfig)
+│   │   ├── network/         # Client Dio, intercepteur JWT & mapping d'erreurs
+│   │   ├── providers/       # Providers Riverpod globaux
+│   │   ├── router/          # Routes GoRouter & shell de navigation
+│   │   ├── storage/         # Base SQLite locale & file de synchronisation
+│   │   ├── theme/           # Palette, typographie & thèmes clair/sombre
+│   │   └── widgets/         # Composants UI partagés, badges & états
+│   └── features/
+│       ├── auth/            # Splash, connexion, inscription & profil
+│       ├── home/            # Tableau de bord quotidien
+│       ├── learning/        # Parcours et détail de leçon
+│       ├── notifications/   # Liste et lecture des notifications
+│       ├── practice/        # Exercices, révisions et progression
+│       ├── sync/            # Gestionnaire de synchronisation hors ligne
+│       └── watch/           # Veille technologique et favoris
+└── test/                    # Tests unitaires de modèles et tests widgets
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/personal_project6595146/dailystack_frontend.git
-git branch -M main
-git push -uf origin main
+
+---
+
+## Lancer le projet
+
+### Prérequis
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) configuré sur votre machine
+- Un émulateur Android, simulateur iOS, macOS desktop ou un appareil physique connecté
+
+### Installation et démarrage
+```bash
+cd dailystack
+flutter pub get
+flutter run
 ```
 
-## Integrate with your tools
+Par défaut, l'application pointe vers l'API de production (`https://dailystack-backend.onrender.com/api/v1` — le premier appel peut prendre jusqu'à ~45 s en cas de réveil du serveur).
 
-* [Set up project integrations](https://gitlab.com/personal_project6595146/dailystack_frontend/-/settings/integrations)
+### Utiliser un backend local
+Vous pouvez surcharger l'URL de l'API au lancement via `--dart-define` :
 
-## Collaborate with your team
+```bash
+# macOS / iOS Simulator / Web
+flutter run --dart-define=API_BASE_URL=http://localhost:8080/api/v1
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+# Émulateur Android
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1
+```
 
-## Test and Deploy
+---
 
-Use the built-in continuous integration in GitLab.
+## Tests et Build
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+```bash
+cd dailystack
 
-***
+# Analyse statique
+flutter analyze --no-fatal-infos
 
-# Editing this README
+# Tests unitaires et widgets
+flutter test
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# Build APK Android (release)
+flutter build apk --release
+```
 
-## Suggestions for a good README
+### Signature Android de production
+1. Copiez `dailystack/android/key.properties.example` vers `dailystack/android/key.properties`.
+2. Générez votre keystore `.jks` et renseignez vos identifiants dans `key.properties` (ce fichier est ignoré par Git).
+3. Lancez `flutter build appbundle --release` ou `flutter build apk --release`.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+- **Application ID / Bundle Identifier** : `com.dailystack.app`
