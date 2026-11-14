@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import '../../features/learning/models/lesson_models.dart';
@@ -21,6 +22,13 @@ class LocalDatabase {
   static const _dbVersion = 1;
 
   Database? _db;
+
+  // Fallback en mémoire pour Flutter Web (sqflite n'est pas supporté nativement sur navigateur).
+  final Map<int, String> _webLessons = {};
+  final Map<int, String> _webNews = {};
+  final List<PendingSyncItem> _webPendingQueue = [];
+  final Map<String, String> _webMetadata = {};
+  int _webNextPendingId = 1;
 
   Future<Database> get database async {
     if (_db != null) return _db!;
@@ -64,6 +72,12 @@ class LocalDatabase {
   }
 
   Future<void> cacheLessons(List<LessonDetail> lessons) async {
+    if (kIsWeb) {
+      for (final lesson in lessons) {
+        _webLessons[lesson.id] = jsonEncode(lesson.toJson());
+      }
+      return;
+    }
     final db = await database;
     final now = DateTime.now().toIso8601String();
     final batch = db.batch();
@@ -82,6 +96,11 @@ class LocalDatabase {
   }
 
   Future<LessonDetail?> getCachedLesson(int lessonId) async {
+    if (kIsWeb) {
+      final rawJson = _webLessons[lessonId];
+      if (rawJson == null) return null;
+      return LessonDetail.fromJson(jsonDecode(rawJson) as Map<String, dynamic>);
+    }
     final db = await database;
     final rows = await db.query(
       'cached_lessons',
@@ -95,6 +114,12 @@ class LocalDatabase {
   }
 
   Future<void> cacheNews(List<TechNewsSummary> news) async {
+    if (kIsWeb) {
+      for (final item in news) {
+        _webNews[item.id] = jsonEncode(item.toJson());
+      }
+      return;
+    }
     final db = await database;
     final now = DateTime.now().toIso8601String();
     final batch = db.batch();
@@ -113,6 +138,14 @@ class LocalDatabase {
   }
 
   Future<List<TechNewsSummary>> getCachedNews() async {
+    if (kIsWeb) {
+      final keys = _webNews.keys.toList()..sort((a, b) => b.compareTo(a));
+      return keys
+          .map((k) => TechNewsSummary.fromJson(
+                jsonDecode(_webNews[k]!) as Map<String, dynamic>,
+              ))
+          .toList();
+    }
     final db = await database;
     final rows = await db.query('cached_news', orderBy: 'id DESC');
     return rows
@@ -126,6 +159,16 @@ class LocalDatabase {
     String actionType,
     Map<String, dynamic> payload,
   ) async {
+    if (kIsWeb) {
+      _webPendingQueue.add(
+        PendingSyncItem(
+          id: _webNextPendingId++,
+          actionType: actionType,
+          payload: Map<String, dynamic>.from(payload),
+        ),
+      );
+      return;
+    }
     final db = await database;
     await db.insert('pending_sync_queue', {
       'action_type': actionType,
@@ -135,6 +178,9 @@ class LocalDatabase {
   }
 
   Future<List<PendingSyncItem>> getPendingActions() async {
+    if (kIsWeb) {
+      return List<PendingSyncItem>.from(_webPendingQueue);
+    }
     final db = await database;
     final rows = await db.query('pending_sync_queue', orderBy: 'id ASC');
     return rows
@@ -149,6 +195,11 @@ class LocalDatabase {
 
   Future<void> clearPendingActions(List<int> ids) async {
     if (ids.isEmpty) return;
+    if (kIsWeb) {
+      final idSet = ids.toSet();
+      _webPendingQueue.removeWhere((item) => idSet.contains(item.id));
+      return;
+    }
     final db = await database;
     final placeholders = List.filled(ids.length, '?').join(',');
     await db.delete(
@@ -159,6 +210,7 @@ class LocalDatabase {
   }
 
   Future<int> getPendingCount() async {
+    if (kIsWeb) return _webPendingQueue.length;
     final db = await database;
     final res = await db.rawQuery(
       'SELECT COUNT(*) as cnt FROM pending_sync_queue',
@@ -167,27 +219,18 @@ class LocalDatabase {
   }
 
   Future<void> setLastSyncTimestamp(String timestamp) async {
-    final db = await database;
-    await db.insert(
-      'sync_metadata',
-      {'key': 'lastServerTimestamp', 'value': timestamp},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await setMetadata('lastServerTimestamp', timestamp);
   }
 
   Future<String?> getLastSyncTimestamp() async {
-    final db = await database;
-    final rows = await db.query(
-      'sync_metadata',
-      where: 'key = ?',
-      whereArgs: ['lastServerTimestamp'],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return rows.first['value'] as String?;
+    return getMetadata('lastServerTimestamp');
   }
 
   Future<void> setMetadata(String key, String value) async {
+    if (kIsWeb) {
+      _webMetadata[key] = value;
+      return;
+    }
     final db = await database;
     await db.insert(
       'sync_metadata',
@@ -197,6 +240,7 @@ class LocalDatabase {
   }
 
   Future<String?> getMetadata(String key) async {
+    if (kIsWeb) return _webMetadata[key];
     final db = await database;
     final rows = await db.query(
       'sync_metadata',
@@ -209,6 +253,13 @@ class LocalDatabase {
   }
 
   Future<void> clearAll() async {
+    if (kIsWeb) {
+      _webLessons.clear();
+      _webNews.clear();
+      _webPendingQueue.clear();
+      _webMetadata.clear();
+      return;
+    }
     final db = await database;
     final batch = db.batch();
     batch.delete('cached_lessons');
@@ -218,4 +269,3 @@ class LocalDatabase {
     await batch.commit(noResult: true);
   }
 }
-
