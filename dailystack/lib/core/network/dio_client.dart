@@ -40,6 +40,8 @@ class DioClient {
       );
     }
     if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
         e.type == DioExceptionType.connectionError) {
       return ApiException('Connexion au serveur impossible. Vérifiez votre réseau.');
     }

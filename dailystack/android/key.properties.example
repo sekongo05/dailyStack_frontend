@@ -1,0 +1,8 @@
+# Copiez ce fichier vers android/key.properties et renseignez vos identifiants réels.
+# Ne commitez jamais android/key.properties ni votre fichier .jks.
+# Exemple pour générer votre keystore :
+# keytool -genkey -v -keystore android/app/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=upload
+storeFile=upload-keystore.jks
