@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui.dart';
 import '../models/news_models.dart';
+import '../widgets/watch_badges.dart';
 
 class WatchScreen extends ConsumerStatefulWidget {
   const WatchScreen({super.key});
@@ -127,16 +129,32 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     }
   }
 
+  void _resetFilters() {
+    _searchController.clear();
+    setState(() {
+      _onlyBookmarks = false;
+      _selectedCategory = null;
+    });
+    _loadNews();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasActiveFilters = _onlyBookmarks ||
+        _selectedCategory != null ||
+        _searchController.text.trim().isNotEmpty;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Veille technologique')),
       body: Column(
         children: [
+          const ScreenHeader(
+            title: 'Veille',
+            subtitle: 'Actualités Backend, DevOps & IA',
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
-              AppSpacing.sm,
+              AppSpacing.xs,
               AppSpacing.md,
               0,
             ),
@@ -149,6 +167,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        tooltip: 'Effacer la recherche',
                         icon: const Icon(Icons.clear_rounded),
                         onPressed: () {
                           _searchController.clear();
@@ -156,60 +179,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         },
                       )
                     : null,
-                border: const OutlineInputBorder(),
-                isDense: true,
               ),
               onChanged: (_) => setState(() {}),
             ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                FilterChip(
-                  avatar: const Icon(Icons.bookmark_rounded, size: 16),
-                  label: const Text('Favoris'),
-                  selected: _onlyBookmarks,
-                  onSelected: (val) {
-                    setState(() => _onlyBookmarks = val);
-                    _loadNews();
-                  },
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                FilterChip(
-                  label: const Text('Toutes'),
-                  selected: !_onlyBookmarks && _selectedCategory == null,
-                  onSelected: (_) {
-                    setState(() {
-                      _onlyBookmarks = false;
-                      _selectedCategory = null;
-                    });
-                    _loadNews();
-                  },
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                for (final cat in WatchCategory.values) ...[
-                  FilterChip(
-                    label: Text(_categoryLabel(cat)),
-                    selected: !_onlyBookmarks && _selectedCategory == cat,
-                    onSelected: (_) {
-                      setState(() {
-                        _onlyBookmarks = false;
-                        _selectedCategory =
-                            _selectedCategory == cat ? null : cat;
-                      });
-                      _loadNews();
-                    },
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                ],
-              ],
-            ),
-          ),
+          _buildFilters(),
           Expanded(
             child: _isLoading
                 ? const AppLoadingView(message: 'Chargement de la veille...')
@@ -224,14 +198,23 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                                 ? 'Ajoutez des articles en favoris pour les retrouver ici.'
                                 : 'Essayez un autre mot-clé ou une autre catégorie.',
                             icon: Icons.newspaper_outlined,
+                            onAction: hasActiveFilters ? _resetFilters : null,
+                            actionLabel: hasActiveFilters
+                                ? 'Réinitialiser les filtres'
+                                : null,
                           )
                         : RefreshIndicator(
                             onRefresh: _loadNews,
                             child: ListView.separated(
-                              padding: const EdgeInsets.all(AppSpacing.md),
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                AppSpacing.xs,
+                                AppSpacing.md,
+                                AppSpacing.xl,
+                              ),
                               itemCount: _items.length,
                               separatorBuilder: (_, _) =>
-                                  const SizedBox(height: AppSpacing.sm),
+                                  const SizedBox(height: AppSpacing.md),
                               itemBuilder: (context, index) {
                                 final item = _items[index];
                                 return _NewsCard(
@@ -250,14 +233,64 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       ),
     );
   }
-}
 
-String _categoryLabel(WatchCategory cat) => switch (cat) {
-      WatchCategory.BACKEND => 'Backend',
-      WatchCategory.DEVOPS => 'DevOps',
-      WatchCategory.AI => 'IA',
-      WatchCategory.EMERGING_TECH => 'Tech Émergente',
-    };
+  Widget _buildFilters() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          FilterChip(
+            avatar: Icon(
+              _onlyBookmarks
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_outline_rounded,
+              size: 16,
+            ),
+            label: const Text('Favoris'),
+            selected: _onlyBookmarks,
+            onSelected: (val) {
+              setState(() => _onlyBookmarks = val);
+              _loadNews();
+            },
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          FilterChip(
+            label: const Text('Toutes'),
+            selected: !_onlyBookmarks && _selectedCategory == null,
+            onSelected: (_) {
+              setState(() {
+                _onlyBookmarks = false;
+                _selectedCategory = null;
+              });
+              _loadNews();
+            },
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          for (final cat in WatchCategory.values) ...[
+            FilterChip(
+              label: Text(watchCategoryLabel(cat)),
+              selected: !_onlyBookmarks && _selectedCategory == cat,
+              onSelected: (_) {
+                setState(() {
+                  _onlyBookmarks = false;
+                  _selectedCategory = _selectedCategory == cat ? null : cat;
+                });
+                _loadNews();
+              },
+            ),
+            const SizedBox(width: AppSpacing.sm),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 class _NewsCard extends StatelessWidget {
   final TechNewsSummary item;
@@ -272,103 +305,94 @@ class _NewsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (impIcon, impColor, impLabel) = switch (item.importance) {
-      WatchImportance.CRITICAL => (
-          Icons.priority_high_rounded,
-          AppColors.error,
-          'Critique'
-        ),
-      WatchImportance.HIGH => (
-          Icons.arrow_upward_rounded,
-          AppColors.warning,
-          'Importante'
-        ),
-      WatchImportance.MEDIUM => (
-          Icons.remove_rounded,
-          AppColors.devops,
-          'Moyenne'
-        ),
-      WatchImportance.LOW => (
-          Icons.arrow_downward_rounded,
-          AppColors.backend,
-          'Info'
-        ),
-    };
-
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return SurfaceCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Chip(
-                    label: Text(_categoryLabel(item.category)),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(impIcon, size: 16, color: impColor),
-                      const SizedBox(width: 2),
-                      Text(
-                        impLabel,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: impColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
-                    ),
-                    onPressed: onBookmarkTap,
-                    tooltip: item.bookmarked
-                        ? 'Retirer des favoris'
-                        : 'Ajouter aux favoris',
-                    icon: Icon(
-                      item.bookmarked
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_outline_rounded,
-                      color: item.bookmarked ? AppColors.devops : null,
-                    ),
-                  ),
-                ],
+              Expanded(
+                child: Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    WatchCategoryPill(category: item.category),
+                    WatchImportancePill(importance: item.importance),
+                  ],
+                ),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                item.title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                item.summary,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                '${item.targetTechnology} • Publié le ${item.publishedDate}',
-                style: Theme.of(context).textTheme.bodySmall,
+              IconButton(
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                onPressed: onBookmarkTap,
+                tooltip: item.bookmarked
+                    ? 'Retirer des favoris'
+                    : 'Ajouter aux favoris',
+                icon: Icon(
+                  item.bookmarked
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_outline_rounded,
+                  color: item.bookmarked
+                      ? AppColors.brand
+                      : context.palette.textMuted,
+                ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            item.title,
+            style: context.text.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            item.summary,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Icon(
+                Icons.memory_rounded,
+                size: 14,
+                color: context.palette.textMuted,
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  '${item.targetTechnology} · ${item.publishedDate}',
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodySmall,
+                ),
+              ),
+              if (item.aiGenerated) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 14,
+                  color: AppColors.brand,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Synthèse IA',
+                  style: context.text.labelSmall?.copyWith(
+                    color: AppColors.brand,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
 }
-

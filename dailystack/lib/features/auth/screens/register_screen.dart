@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/ui.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -16,6 +17,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
   Map<String, dynamic>? _fieldErrors;
@@ -64,40 +66,38 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Créer un compte')),
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Retour',
+          onPressed: () => context.go('/login'),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Rejoindre DailyStack',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: AppLogo(size: 56),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text('Créer un compte', style: context.text.displaySmall),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Commencez votre progression Backend & DevOps dès aujourd\'hui.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  if (_errorMessage != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm + 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: AppColors.error),
-                      ),
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.palette.textMuted,
                     ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  if (_errorMessage != null) ...[
+                    InlineError(message: _errorMessage!),
                     const SizedBox(height: AppSpacing.md),
                   ],
                   TextField(
@@ -105,8 +105,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: 'Nom d\'utilisateur',
+                      prefixIcon: const Icon(Icons.person_outline_rounded),
                       errorText: _fieldErrors?['username'] as String?,
-                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -116,38 +116,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: 'Adresse e-mail',
+                      prefixIcon: const Icon(Icons.mail_outline_rounded),
                       errorText: _fieldErrors?['email'] as String?,
-                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _isLoading ? null : _submit(),
                     decoration: InputDecoration(
                       labelText: 'Mot de passe',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
                       errorText: _fieldErrors?['password'] as String?,
-                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('S\'inscrire'),
+                  PrimaryButton(
+                    label: 'S\'inscrire',
+                    isLoading: _isLoading,
+                    onPressed: _submit,
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextButton(
-                    style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-                    onPressed: () => context.go('/login'),
-                    child: const Text('Déjà inscrit ? Se connecter'),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Déjà inscrit ?', style: context.text.bodySmall),
+                      TextButton(
+                        onPressed: () => context.go('/login'),
+                        child: const Text('Se connecter'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -158,4 +169,3 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 }
-

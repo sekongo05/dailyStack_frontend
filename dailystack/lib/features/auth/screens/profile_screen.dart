@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui.dart';
 import '../models/auth_models.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -114,191 +115,239 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil & Préférences')),
-      body: _isLoading
-          ? const AppLoadingView(message: 'Chargement du profil...')
-          : _error != null || _profile == null
-              ? AppErrorView(
-                  message: _error ?? 'Profil indisponible.',
-                  onRetry: _loadProfile,
-                )
-              : ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: Row(
+      body: Column(
+        children: [
+          const ScreenHeader(
+            title: 'Profil',
+            subtitle: 'Compte, apparence et notifications',
+          ),
+          Expanded(
+            child: _isLoading
+                ? const AppLoadingView(message: 'Chargement du profil...')
+                : _error != null || _profile == null
+                    ? AppErrorView(
+                        message: _error ?? 'Profil indisponible.',
+                        onRetry: _loadProfile,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadProfile,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md,
+                            AppSpacing.sm,
+                            AppSpacing.md,
+                            AppSpacing.xl,
+                          ),
                           children: [
-                            CircleAvatar(
-                              radius: 26,
-                              child: Text(
-                                _profile!.username.isNotEmpty
-                                    ? _profile!.username[0].toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
+                            _UserHeaderCard(profile: _profile!),
+                            const SizedBox(height: AppSpacing.lg),
+                            const SectionHeader(title: 'Apparence'),
+                            SurfaceCard(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Text(
-                                    _profile!.username,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  Text('Thème', style: context.text.titleSmall),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  SegmentedButton<ThemePreference>(
+                                    segments: const [
+                                      ButtonSegment(
+                                        value: ThemePreference.LIGHT,
+                                        label: Text('Clair'),
+                                        icon: Icon(Icons.light_mode_outlined),
+                                      ),
+                                      ButtonSegment(
+                                        value: ThemePreference.DARK,
+                                        label: Text('Sombre'),
+                                        icon: Icon(Icons.dark_mode_outlined),
+                                      ),
+                                      ButtonSegment(
+                                        value: ThemePreference.SYSTEM,
+                                        label: Text('Système'),
+                                        icon: Icon(Icons.settings_suggest_outlined),
+                                      ),
+                                    ],
+                                    selected: {_theme},
+                                    onSelectionChanged: (s) =>
+                                        setState(() => _theme = s.first),
                                   ),
+                                  const SizedBox(height: AppSpacing.md),
                                   Text(
-                                    _profile!.email,
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
+                                    'Taille du texte',
+                                    style: context.text.titleSmall,
                                   ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    'Niveau ${_profile!.currentLevel} • Série : ${_profile!.streakDays} jour(s)',
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
+                                  const SizedBox(height: AppSpacing.sm),
+                                  SegmentedButton<TextSizePreference>(
+                                    segments: const [
+                                      ButtonSegment(
+                                        value: TextSizePreference.SMALL,
+                                        label: Text('Petit'),
+                                      ),
+                                      ButtonSegment(
+                                        value: TextSizePreference.MEDIUM,
+                                        label: Text('Moyen'),
+                                      ),
+                                      ButtonSegment(
+                                        value: TextSizePreference.LARGE,
+                                        label: Text('Grand'),
+                                      ),
+                                    ],
+                                    selected: {_textSize},
+                                    onSelectionChanged: (s) =>
+                                        setState(() => _textSize = s.first),
                                   ),
                                 ],
                               ),
                             ),
+                            const SizedBox(height: AppSpacing.lg),
+                            const SectionHeader(title: 'Rappels & notifications'),
+                            SurfaceCard(
+                              padding: EdgeInsets.zero,
+                              child: Column(
+                                children: [
+                                  ListTile(
+                                    leading: const IconTile(
+                                      icon: Icons.alarm_rounded,
+                                      color: AppColors.brand,
+                                      size: 38,
+                                    ),
+                                    title: const Text('Heure du rappel'),
+                                    subtitle: Text(
+                                      _reminderTime.length >= 5
+                                          ? _reminderTime.substring(0, 5)
+                                          : _reminderTime,
+                                    ),
+                                    trailing: Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: context.palette.textMuted,
+                                    ),
+                                    onTap: _pickReminderTime,
+                                  ),
+                                  const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+                                  SwitchListTile(
+                                    title: const Text('Leçon du jour'),
+                                    subtitle: const Text('Notification quotidienne'),
+                                    value: _notifyDailyLesson,
+                                    onChanged: (v) =>
+                                        setState(() => _notifyDailyLesson = v),
+                                  ),
+                                  const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+                                  SwitchListTile(
+                                    title: const Text('Révisions'),
+                                    subtitle: const Text('Rappel des notions à consolider'),
+                                    value: _notifyReviews,
+                                    onChanged: (v) =>
+                                        setState(() => _notifyReviews = v),
+                                  ),
+                                  const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+                                  SwitchListTile(
+                                    title: const Text('Veille tech importante'),
+                                    subtitle: const Text('Alertes critiques uniquement'),
+                                    value: _notifyImportantNews,
+                                    onChanged: (v) =>
+                                        setState(() => _notifyImportantNews = v),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            PrimaryButton(
+                              label: 'Enregistrer les préférences',
+                              icon: Icons.check_rounded,
+                              isLoading: _isSaving,
+                              onPressed: _savePreferences,
+                            ),
+                            const SizedBox(height: AppSpacing.sm + 4),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                side: BorderSide(
+                                  color: AppColors.error.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              onPressed: _logout,
+                              icon: const Icon(Icons.logout_rounded),
+                              label: const Text('Se déconnecter'),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Apparence',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            SegmentedButton<ThemePreference>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: ThemePreference.LIGHT,
-                                  label: Text('Clair'),
-                                  icon: Icon(Icons.light_mode_outlined),
-                                ),
-                                ButtonSegment(
-                                  value: ThemePreference.DARK,
-                                  label: Text('Sombre'),
-                                  icon: Icon(Icons.dark_mode_outlined),
-                                ),
-                                ButtonSegment(
-                                  value: ThemePreference.SYSTEM,
-                                  label: Text('Système'),
-                                  icon: Icon(Icons.settings_suggest_outlined),
-                                ),
-                              ],
-                              selected: {_theme},
-                              onSelectionChanged: (s) =>
-                                  setState(() => _theme = s.first),
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            Text(
-                              'Taille du texte',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            SegmentedButton<TextSizePreference>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: TextSizePreference.SMALL,
-                                  label: Text('Petit'),
-                                ),
-                                ButtonSegment(
-                                  value: TextSizePreference.MEDIUM,
-                                  label: Text('Moyen'),
-                                ),
-                                ButtonSegment(
-                                  value: TextSizePreference.LARGE,
-                                  label: Text('Grand'),
-                                ),
-                              ],
-                              selected: {_textSize},
-                              onSelectionChanged: (s) =>
-                                  setState(() => _textSize = s.first),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Card(
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.alarm_rounded),
-                            title: const Text('Heure du rappel quotidien'),
-                            subtitle: Text(_reminderTime.substring(0, 5)),
-                            trailing: const Icon(Icons.edit_outlined),
-                            onTap: _pickReminderTime,
-                          ),
-                          const Divider(height: 1),
-                          SwitchListTile(
-                            title: const Text('Rappel leçon du jour'),
-                            value: _notifyDailyLesson,
-                            onChanged: (v) =>
-                                setState(() => _notifyDailyLesson = v),
-                          ),
-                          SwitchListTile(
-                            title: const Text('Rappel des révisions'),
-                            value: _notifyReviews,
-                            onChanged: (v) =>
-                                setState(() => _notifyReviews = v),
-                          ),
-                          SwitchListTile(
-                            title: const Text('Alertes veille importantes'),
-                            value: _notifyImportantNews,
-                            onChanged: (v) =>
-                                setState(() => _notifyImportantNews = v),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _savePreferences,
-                      icon: const Icon(Icons.save_rounded),
-                      label: _isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Enregistrer les préférences'),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(44, 48),
-                        foregroundColor: AppColors.error,
-                      ),
-                      onPressed: _logout,
-                      icon: const Icon(Icons.logout_rounded),
-                      label: const Text('Se déconnecter'),
-                    ),
-                  ],
-                ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+class _UserHeaderCard extends StatelessWidget {
+  final UserProfile profile;
+  const _UserHeaderCard({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = profile.username.isNotEmpty
+        ? profile.username[0].toUpperCase()
+        : 'U';
+
+    return SurfaceCard(
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.brand, AppColors.brandDark],
+              ),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initial,
+              style: context.text.headlineSmall?.copyWith(color: Colors.white),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  profile.username,
+                  style: context.text.titleLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  profile.email,
+                  style: context.text.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    TagPill(
+                      label: 'Niveau ${profile.currentLevel}',
+                      color: AppColors.brand,
+                      icon: Icons.workspace_premium_rounded,
+                    ),
+                    TagPill(
+                      label: '${profile.streakDays} j de suite',
+                      color: AppColors.streak,
+                      icon: Icons.local_fire_department_rounded,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

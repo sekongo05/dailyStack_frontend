@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/ui.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -35,8 +36,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       ref.read(offlineSyncProvider.notifier).syncNow();
       context.go('/home');
     } catch (_) {
-      // Si hors ligne mais session présente, on laisse entrer vers /home (Phase 5 gérera le cache)
-      // Si 401 + refresh expiré, DioClient aura déjà redirigé vers /login.
       if (!mounted) return;
       final stillHasSession = await authService.hasStoredSession();
       if (!mounted) return;
@@ -51,18 +50,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'DailyStack',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
+            const AppLogo(size: 88),
             const SizedBox(height: AppSpacing.md),
-            const CircularProgressIndicator(),
+            Text('DailyStack', style: context.text.headlineLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text('Apprendre un peu chaque jour', style: context.text.bodySmall),
+            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.8,
+                strokeCap: StrokeCap.round,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

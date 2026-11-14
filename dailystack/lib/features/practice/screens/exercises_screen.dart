@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui.dart';
 import '../models/practice_models.dart';
 import '../widgets/mastery_badge.dart';
 
@@ -82,7 +83,7 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
           );
       if (!mounted) return;
       setState(() => _result = result);
-    } catch (e) {
+    } catch (_) {
       await ref.read(offlineSyncProvider.notifier).queueAttempt(
             exerciseId: exercise.id,
             selectedOptionId: selectedOpt,
@@ -155,135 +156,130 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Exercice ${_currentIndex + 1} / ${_exercises.length}'),
+        title: Text('Exercice ${_currentIndex + 1} sur ${_exercises.length}'),
       ),
       body: Column(
         children: [
-          LinearProgressIndicator(
+          ProgressBar(
             value: (_currentIndex + 1) / _exercises.length,
-            minHeight: 5,
+            height: 4,
           ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 680),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (exercise.conceptName != null)
-                        Flexible(
-                          child: Chip(
-                            label: Text(
-                              exercise.conceptName!,
-                              overflow: TextOverflow.ellipsis,
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (exercise.conceptName != null)
+                            TagPill(
+                              label: exercise.conceptName!,
+                              color: AppColors.brand,
+                              icon: Icons.lightbulb_outline_rounded,
+                            ),
+                          TagPill(
+                            label: '${exercise.points} pts',
+                            color: AppColors.streak,
+                            icon: Icons.bolt_rounded,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        exercise.question,
+                        style: context.text.titleLarge,
+                      ),
+                      if (exercise.codeSnippet != null &&
+                          exercise.codeSnippet!.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: context.palette.surfaceAlt,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: context.palette.border),
+                          ),
+                          child: SelectableText(
+                            exercise.codeSnippet!,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 13.5,
+                              height: 1.5,
                             ),
                           ),
                         ),
-                      Text(
-                        '${exercise.points} pts',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      if (options.isNotEmpty)
+                        ...options.map((opt) {
+                          final isSelected = _selectedOptionId == opt.id;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
+                            child: SurfaceCard(
+                              onTap: _result != null
+                                  ? null
+                                  : () => setState(
+                                        () => _selectedOptionId = opt.id,
+                                      ),
+                              color: isSelected
+                                  ? AppColors.brand.withValues(alpha: 0.08)
+                                  : null,
+                              borderColor: isSelected ? AppColors.brand : null,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: 14,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isSelected
+                                        ? Icons.radio_button_checked_rounded
+                                        : Icons.radio_button_unchecked_rounded,
+                                    color: isSelected
+                                        ? AppColors.brand
+                                        : context.palette.textMuted,
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Text(
+                                      opt.text,
+                                      style: context.text.bodyLarge?.copyWith(
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                      ),
+                          );
+                        })
+                      else
+                        TextField(
+                          controller: _textController,
+                          enabled: _result == null,
+                          maxLines: 5,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Votre réponse',
+                            alignLabelWithHint: true,
+                          ),
+                        ),
+                      if (_result != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        _FeedbackCard(result: _result!),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    exercise.question,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  if (exercise.codeSnippet != null &&
-                      exercise.codeSnippet!.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SelectableText(
-                        exercise.codeSnippet!,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  if (options.isNotEmpty)
-                    ...options.map((opt) {
-                      final isSelected = _selectedOptionId == opt.id;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: InkWell(
-                          onTap: _result != null
-                              ? null
-                              : () =>
-                                  setState(() => _selectedOptionId = opt.id),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            constraints: const BoxConstraints(minHeight: 52),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.sm,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).dividerColor,
-                                width: isSelected ? 2 : 1,
-                              ),
-                              color: isSelected
-                                  ? Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withValues(alpha: 0.08)
-                                  : null,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isSelected
-                                      ? Icons.radio_button_checked_rounded
-                                      : Icons.radio_button_unchecked_rounded,
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                      : null,
-                                ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(child: Text(opt.text)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    })
-                  else
-                    TextField(
-                      controller: _textController,
-                      enabled: _result == null,
-                      maxLines: 5,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Votre réponse',
-                        alignLabelWithHint: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  if (_result != null) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    _FeedbackCard(result: _result!),
-                  ],
-                ],
+                ),
               ),
             ),
           ),
@@ -291,33 +287,19 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
             top: false,
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: SizedBox(
-                width: double.infinity,
-                child: _result == null
-                    ? ElevatedButton(
-                        onPressed: canSubmit ? _submit : null,
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Valider ma réponse'),
-                      )
-                    : ElevatedButton.icon(
-                        onPressed: _nextExercise,
-                        icon: Icon(
-                          isLast
-                              ? Icons.check_rounded
-                              : Icons.arrow_forward_rounded,
-                        ),
-                        label: Text(
-                          isLast ? 'Terminer la session' : 'Exercice suivant',
-                        ),
-                      ),
-              ),
+              child: _result == null
+                  ? PrimaryButton(
+                      label: 'Valider ma réponse',
+                      isLoading: _isSubmitting,
+                      onPressed: canSubmit ? _submit : null,
+                    )
+                  : PrimaryButton(
+                      label: isLast ? 'Terminer la session' : 'Exercice suivant',
+                      icon: isLast
+                          ? Icons.check_rounded
+                          : Icons.arrow_forward_rounded,
+                      onPressed: _nextExercise,
+                    ),
             ),
           ),
         ],
@@ -335,61 +317,53 @@ class _FeedbackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = result.correct ? AppColors.success : AppColors.warning;
     final icon =
-        result.correct ? Icons.check_circle_rounded : Icons.lightbulb_rounded;
+        result.correct ? Icons.check_rounded : Icons.lightbulb_rounded;
     final title = result.correct
         ? 'Bonne réponse ! (+${result.scoreEarned} pts)'
-        : 'À consolider — Voici l\'explication';
+        : 'À consolider — Explication';
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color, semanticLabel: title),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                  ),
+    return SurfaceCard(
+      color: color.withValues(alpha: 0.06),
+      borderColor: color.withValues(alpha: 0.35),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconTile(icon: icon, color: color, size: 38),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  title,
+                  style: context.text.titleMedium?.copyWith(color: color),
                 ),
-              ],
-            ),
-            if (result.optionFeedback != null &&
-                result.optionFeedback!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                result.optionFeedback!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
               ),
             ],
-            if (result.explanation.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                result.explanation,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
+          ),
+          if (result.optionFeedback != null &&
+              result.optionFeedback!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Maîtrise de la notion :'),
-                MasteryBadge(level: result.conceptMasteryLevel),
-              ],
+            Text(
+              result.optionFeedback!,
+              style: context.text.titleSmall,
             ),
           ],
-        ),
+          if (result.explanation.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(result.explanation, style: context.text.bodyMedium),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          const Divider(),
+          const SizedBox(height: AppSpacing.sm + 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Maîtrise', style: context.text.bodySmall),
+              MasteryBadge(level: result.conceptMasteryLevel),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
-

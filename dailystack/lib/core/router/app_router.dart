@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/app_providers.dart';
+import '../theme/app_theme.dart';
 import '../widgets/state_views.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/profile_screen.dart';
@@ -15,6 +16,7 @@ import '../../features/practice/screens/progress_screen.dart';
 import '../../features/practice/screens/reviews_screen.dart';
 import '../../features/watch/screens/news_detail_screen.dart';
 import '../../features/watch/screens/watch_screen.dart';
+import '../../features/notifications/screens/notifications_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -57,6 +59,10 @@ class AppRouter {
       GoRoute(
         path: '/reviews',
         builder: (context, state) => const ReviewsScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/watch/:id',
@@ -129,49 +135,54 @@ class _MainShell extends ConsumerWidget {
     final syncState = ref.watch(offlineSyncProvider);
 
     return Scaffold(
-      body: Column(
-        children: [
-          if (!syncState.isOnline)
-            SafeArea(
-              bottom: false,
-              child: OfflineBanner(pendingSync: syncState.pendingCount > 0),
-            ),
-          Expanded(child: navigationShell),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) => navigationShell.goBranch(
-          index,
-          initialLocation: index == navigationShell.currentIndex,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            if (!syncState.isOnline)
+              OfflineBanner(pendingSync: syncState.pendingCount > 0),
+            Expanded(child: navigationShell),
+          ],
         ),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Accueil',
+      ),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: context.palette.border)),
+        ),
+        child: NavigationBar(
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: (index) => navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school_rounded),
-            label: 'Apprentissage',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.newspaper_outlined),
-            selectedIcon: Icon(Icons.newspaper_rounded),
-            label: 'Veille',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights_rounded),
-            label: 'Progression',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profil',
-          ),
-        ],
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: 'Accueil',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.auto_stories_outlined),
+              selectedIcon: Icon(Icons.auto_stories_rounded),
+              label: 'Apprendre',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bolt_outlined),
+              selectedIcon: Icon(Icons.bolt_rounded),
+              label: 'Veille',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bar_chart_outlined),
+              selectedIcon: Icon(Icons.bar_chart_rounded),
+              label: 'Progrès',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded),
+              selectedIcon: Icon(Icons.person_rounded),
+              label: 'Profil',
+            ),
+          ],
+        ),
       ),
     );
   }

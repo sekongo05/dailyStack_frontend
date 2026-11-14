@@ -63,6 +63,7 @@ class TechNewsSummary {
 }
 
 class TechNewsDetail extends TechNewsSummary {
+  final String? fullContent;
   final String? changesSummary;
   final String? developerImpact;
   final String originalSourceUrl;
@@ -78,6 +79,7 @@ class TechNewsDetail extends TechNewsSummary {
     required super.lastVerifiedDate,
     required super.aiGenerated,
     required super.bookmarked,
+    this.fullContent,
     this.changesSummary,
     this.developerImpact,
     required this.originalSourceUrl,
@@ -96,6 +98,7 @@ class TechNewsDetail extends TechNewsSummary {
       lastVerifiedDate: base.lastVerifiedDate,
       aiGenerated: base.aiGenerated,
       bookmarked: base.bookmarked,
+      fullContent: json['fullContent'] as String?,
       changesSummary: json['changesSummary'] as String?,
       developerImpact: json['developerImpact'] as String?,
       originalSourceUrl: json['originalSourceUrl'] as String? ?? '',

@@ -8,6 +8,7 @@ import '../../features/auth/services/auth_service.dart';
 import '../../features/learning/services/lesson_service.dart';
 import '../../features/practice/services/practice_service.dart';
 import '../../features/watch/services/news_service.dart';
+import '../../features/notifications/services/notification_service.dart';
 import '../../features/sync/services/offline_sync_manager.dart';
 import '../../features/sync/services/sync_service.dart';
 
@@ -38,6 +39,10 @@ final practiceServiceProvider = Provider<PracticeService>(
 
 final newsServiceProvider = Provider<NewsService>(
   (ref) => NewsService(ref.watch(dioClientProvider)),
+);
+
+final notificationServiceProvider = Provider<NotificationService>(
+  (ref) => NotificationService(ref.watch(dioClientProvider)),
 );
 
 final syncServiceProvider = Provider<SyncService>(

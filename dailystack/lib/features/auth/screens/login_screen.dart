@@ -1,10 +1,10 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/ui.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -14,12 +14,9 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController(
-    text: '',
-  );
-  final _passwordController = TextEditingController(
-    text: '',
-  );
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
   Map<String, dynamic>? _fieldErrors;
@@ -71,34 +68,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'DailyStack',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: AppLogo(size: 64),
                   ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text('Bon retour', style: context.text.displaySmall),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Apprendre chaque jour. Progresser sans limite.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    'Connectez-vous pour reprendre votre progression Backend & DevOps.',
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.palette.textMuted,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   if (_errorMessage != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm + 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    ),
+                    InlineError(message: _errorMessage!),
                     const SizedBox(height: AppSpacing.md),
                   ],
                   TextField(
@@ -107,38 +96,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: 'Adresse e-mail',
+                      prefixIcon: const Icon(Icons.mail_outline_rounded),
                       errorText: _fieldErrors?['email'] as String?,
-                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _isLoading ? null : _submit(),
                     decoration: InputDecoration(
                       labelText: 'Mot de passe',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
                       errorText: _fieldErrors?['password'] as String?,
-                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Se connecter'),
+                  PrimaryButton(
+                    label: 'Se connecter',
+                    isLoading: _isLoading,
+                    onPressed: _submit,
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextButton(
-                    style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-                    onPressed: () => context.go('/register'),
-                    child: const Text('Pas encore de compte ? S\'inscrire'),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Pas encore de compte ?', style: context.text.bodySmall),
+                      TextButton(
+                        onPressed: () => context.go('/register'),
+                        child: const Text('S\'inscrire'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -149,4 +149,3 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
-

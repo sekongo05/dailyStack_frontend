@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui.dart';
 import '../models/news_models.dart';
+import '../widgets/watch_badges.dart';
 
 class NewsDetailScreen extends ConsumerStatefulWidget {
   final int newsId;
@@ -66,6 +68,7 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
           lastVerifiedDate: d.lastVerifiedDate,
           aiGenerated: d.aiGenerated,
           bookmarked: bookmarked,
+          fullContent: d.fullContent,
           changesSummary: d.changesSummary,
           developerImpact: d.developerImpact,
           originalSourceUrl: d.originalSourceUrl,
@@ -81,159 +84,178 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final detail = _detail;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Détail de la veille'),
+        title: const Text('Veille'),
         actions: [
-          if (_detail != null)
+          if (detail != null)
             IconButton(
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               onPressed: _toggleBookmark,
-              tooltip: _detail!.bookmarked
+              tooltip: detail.bookmarked
                   ? 'Retirer des favoris'
                   : 'Ajouter aux favoris',
               icon: Icon(
-                _detail!.bookmarked
+                detail.bookmarked
                     ? Icons.bookmark_rounded
                     : Icons.bookmark_outline_rounded,
+                color: detail.bookmarked ? AppColors.brand : null,
               ),
             ),
         ],
       ),
       body: _isLoading
-          ? const AppLoadingView(message: 'Chargement de l\'article...')
-          : _error != null || _detail == null
-              ? AppErrorView(
-                  message: _error ?? 'Article introuvable.',
-                  onRetry: _load,
-                )
-              : ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.xs,
-                      children: [
-                        Chip(label: Text(_detail!.targetTechnology)),
-                        if (_detail!.aiGenerated)
-                          const Chip(
-                            avatar: Icon(Icons.auto_awesome_rounded, size: 16),
-                            label: Text('Synthèse assistée par IA'),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      _detail!.title,
-                      style:
-                          Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Publié le ${_detail!.publishedDate} • Vérifié le ${_detail!.lastVerifiedDate}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      _detail!.summary,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                    if (_detail!.changesSummary != null &&
-                        _detail!.changesSummary!.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      _InfoSection(
-                        icon: Icons.update_rounded,
-                        title: 'Ce qui change',
-                        content: _detail!.changesSummary!,
+          ? const AppLoadingView(message: 'Chargement de l’article...')
+          : _error != null
+              ? AppErrorView(message: _error!, onRetry: _load)
+              : detail == null
+                  ? const AppEmptyView(
+                      title: 'Article introuvable',
+                      subtitle: 'Cet article n’est plus disponible.',
+                      icon: Icons.article_outlined,
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        AppSpacing.sm,
+                        AppSpacing.md,
+                        AppSpacing.xl,
                       ),
-                    ],
-                    if (_detail!.developerImpact != null &&
-                        _detail!.developerImpact!.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _InfoSection(
-                        icon: Icons.code_rounded,
-                        title: 'Impact développeur',
-                        content: _detail!.developerImpact!,
-                      ),
-                    ],
-                    if (_detail!.originalSourceUrl.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 720),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: AppSpacing.xs,
+                                runSpacing: AppSpacing.xs,
                                 children: [
-                                  const Icon(Icons.link_rounded, size: 18),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  Text(
-                                    'Source officielle',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  WatchCategoryPill(category: detail.category),
+                                  WatchImportancePill(
+                                    importance: detail.importance,
                                   ),
+                                  TagPill(
+                                    label: detail.targetTechnology,
+                                    color: AppColors.brand,
+                                    icon: Icons.memory_rounded,
+                                  ),
+                                  if (detail.aiGenerated)
+                                    TagPill(
+                                      label: 'Synthèse IA',
+                                      color: context.palette.textMuted,
+                                      icon: Icons.auto_awesome_rounded,
+                                    ),
                                 ],
                               ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                detail.title,
+                                style: context.text.headlineMedium,
+                              ),
                               const SizedBox(height: AppSpacing.xs),
-                              SelectableText(
-                                _detail!.originalSourceUrl,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
+                              Text(
+                                'Publié le ${detail.publishedDate}${detail.lastVerifiedDate.isNotEmpty ? ' · Vérifié le ${detail.lastVerifiedDate}' : ''}',
+                                style: context.text.bodySmall,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              SurfaceCard(
+                                child: Text(
+                                  detail.summary,
+                                  style: context.text.bodyLarge,
                                 ),
                               ),
+                              if (detail.changesSummary != null &&
+                                  detail.changesSummary!.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                _InfoSection(
+                                  icon: Icons.compare_arrows_rounded,
+                                  color: AppColors.backend,
+                                  title: 'Ce qui change',
+                                  content: detail.changesSummary!,
+                                ),
+                              ],
+                              if (detail.developerImpact != null &&
+                                  detail.developerImpact!.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                _InfoSection(
+                                  icon: Icons.engineering_rounded,
+                                  color: AppColors.warning,
+                                  title: 'Impact développeur',
+                                  content: detail.developerImpact!,
+                                ),
+                              ],
+                              if (detail.fullContent != null &&
+                                  detail.fullContent!.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                _InfoSection(
+                                  icon: Icons.article_rounded,
+                                  color: AppColors.devops,
+                                  title: 'Article complet',
+                                  content: detail.fullContent!,
+                                ),
+                              ],
+                              if (detail.originalSourceUrl.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                _InfoSection(
+                                  icon: Icons.link_rounded,
+                                  color: context.palette.textMuted,
+                                  title: 'Source originale',
+                                  content: detail.originalSourceUrl,
+                                  selectable: true,
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       ),
-                    ],
-                  ],
-                ),
+                    ),
     );
   }
 }
 
 class _InfoSection extends StatelessWidget {
   final IconData icon;
+  final Color color;
   final String title;
   final String content;
+  final bool selectable;
 
   const _InfoSection({
     required this.icon,
+    required this.color,
     required this.title,
     required this.content,
+    this.selectable = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: AppColors.devops),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(content, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconTile(icon: icon, color: color, size: 36),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(title, style: context.text.titleMedium),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          selectable
+              ? SelectableText(
+                  content,
+                  style: context.text.bodyMedium?.copyWith(
+                    color: AppColors.brand,
+                  ),
+                )
+              : Text(content, style: context.text.bodyMedium),
+        ],
       ),
     );
   }
 }
-

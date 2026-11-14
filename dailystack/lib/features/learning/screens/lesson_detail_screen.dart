@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/domain_badge.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../../core/widgets/ui.dart';
 import '../models/lesson_models.dart';
 
 class LessonDetailScreen extends ConsumerStatefulWidget {
@@ -19,9 +21,10 @@ class LessonDetailScreen extends ConsumerStatefulWidget {
 
 class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   final ScrollController _scrollController = ScrollController();
+  Timer? _scrollSaveTimer;
   LessonDetail? _lesson;
   List<LessonSection> _sections = [];
-  int _currentIndex = 0;
+  double _scrollRatio = 0.0;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isCompleted = false;
@@ -30,13 +33,35 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadLesson();
   }
 
   @override
   void dispose() {
+    _scrollSaveTimer?.cancel();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxExtent = _scrollController.position.maxScrollExtent;
+    final ratio = maxExtent > 0
+        ? (_scrollController.position.pixels / maxExtent).clamp(0.0, 1.0)
+        : 1.0;
+
+    if ((ratio - _scrollRatio).abs() >= 0.02) {
+      setState(() => _scrollRatio = ratio);
+    }
+
+    _scrollSaveTimer?.cancel();
+    _scrollSaveTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted && !_isCompleted) {
+        _saveProgress(markAsCompleted: false);
+      }
+    });
   }
 
   Future<void> _loadLesson() async {
@@ -68,36 +93,61 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   void _applyLoadedLesson(LessonDetail detail) {
     final sorted = [...detail.sections]
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
-    final savedIndex = detail.userProgress?.lastReadSectionIndex ?? 0;
-    final clampedIndex =
-        sorted.isEmpty ? 0 : savedIndex.clamp(0, sorted.length - 1);
+    final savedRatio =
+        (detail.userProgress?.scrollOffsetRatio ?? 0.0).clamp(0.0, 1.0);
 
     if (!mounted) return;
     setState(() {
       _lesson = detail;
       _sections = sorted;
-      _currentIndex = clampedIndex;
+      _scrollRatio = savedRatio;
       _isCompleted =
           detail.userProgress?.status == LessonProgressStatus.COMPLETED;
       _isLoading = false;
     });
+
+    if (savedRatio > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        final maxExtent = _scrollController.position.maxScrollExtent;
+        if (maxExtent > 0) {
+          _scrollController.jumpTo(maxExtent * savedRatio);
+        }
+      });
+    }
+  }
+
+  int _estimatedSectionIndex() {
+    if (_sections.isEmpty) return 0;
+    return (_scrollRatio * (_sections.length - 1)).round().clamp(
+          0,
+          _sections.length - 1,
+        );
   }
 
   Future<void> _saveProgress({bool markAsCompleted = false}) async {
     if (_sections.isEmpty) return;
-    setState(() => _isSaving = true);
-    final ratio =
-        double.parse(((_currentIndex + 1) / _sections.length).toStringAsFixed(2));
+    if (markAsCompleted) setState(() => _isSaving = true);
+
+    final ratio = double.parse(
+      (markAsCompleted ? 1.0 : _scrollRatio).toStringAsFixed(2),
+    );
+    final sectionIndex =
+        markAsCompleted ? _sections.length - 1 : _estimatedSectionIndex();
+
     try {
       await ref.read(lessonServiceProvider).updateProgress(
             lessonId: widget.lessonId,
-            lastReadSectionIndex: _currentIndex,
+            lastReadSectionIndex: sectionIndex,
             scrollOffsetRatio: ratio,
             markAsCompleted: markAsCompleted,
           );
       if (!mounted) return;
       if (markAsCompleted) {
-        setState(() => _isCompleted = true);
+        setState(() {
+          _isCompleted = true;
+          _scrollRatio = 1.0;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Bravo ! Leçon terminée avec succès.'),
@@ -107,12 +157,15 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     } catch (_) {
       await ref.read(offlineSyncProvider.notifier).queueProgress(
             lessonId: widget.lessonId,
-            lastReadSectionIndex: _currentIndex,
+            lastReadSectionIndex: sectionIndex,
             scrollOffsetRatio: ratio,
             status: markAsCompleted ? 'COMPLETED' : 'IN_PROGRESS',
           );
       if (mounted && markAsCompleted) {
-        setState(() => _isCompleted = true);
+        setState(() {
+          _isCompleted = true;
+          _scrollRatio = 1.0;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -122,17 +175,44 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted && markAsCompleted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
-  void _goToSection(int newIndex) {
-    if (newIndex < 0 || newIndex >= _sections.length) return;
-    setState(() => _currentIndex = newIndex);
-    if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
-    }
-    _saveProgress();
+  MarkdownStyleSheet _markdownStyle(BuildContext context) {
+    return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+      p: context.text.bodyLarge,
+      h1: context.text.headlineMedium,
+      h2: context.text.headlineSmall,
+      h3: context.text.titleLarge,
+      listBullet: context.text.bodyLarge,
+      code: context.text.bodyMedium?.copyWith(
+        fontFamily: 'monospace',
+        backgroundColor: context.palette.surfaceAlt,
+      ),
+      codeblockDecoration: BoxDecoration(
+        color: context.palette.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: context.palette.border),
+      ),
+      codeblockPadding: const EdgeInsets.all(AppSpacing.md),
+      blockquoteDecoration: BoxDecoration(
+        color: AppColors.brand.withValues(alpha: 0.06),
+        border: const Border(
+          left: BorderSide(color: AppColors.brand, width: 3.5),
+        ),
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(AppRadius.sm),
+          bottomRight: Radius.circular(AppRadius.sm),
+        ),
+      ),
+      blockquotePadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
+    );
   }
 
   @override
@@ -165,105 +245,115 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       );
     }
 
-    final section = _sections[_currentIndex];
-    final isLastSection = _currentIndex == _sections.length - 1;
-    final progressValue = (_currentIndex + 1) / _sections.length;
+    final mdStyle = _markdownStyle(context);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          lesson.title,
+          lesson.trackTitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+          style: context.text.titleSmall?.copyWith(
+            color: context.palette.textMuted,
+          ),
         ),
       ),
       body: Column(
         children: [
-          LinearProgressIndicator(value: progressValue, minHeight: 5),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              0,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                DomainBadge(domainCode: lesson.domainCode),
-                Text(
-                  'Section ${_currentIndex + 1} / ${_sections.length}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
-            ),
-          ),
+          ProgressBar(value: _scrollRatio, height: 4),
           Expanded(
             child: SingleChildScrollView(
               controller: _scrollController,
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    section.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg - 4,
+                vertical: AppSpacing.md,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          DomainBadge(domainCode: lesson.domainCode),
+                          TagPill(
+                            label: '${lesson.estimatedMinutes} min · Jour ${lesson.sequenceDay}',
+                            color: AppColors.brand,
+                            icon: Icons.schedule_rounded,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(lesson.title, style: context.text.headlineMedium),
+                      const SizedBox(height: AppSpacing.lg),
+                      for (var i = 0; i < _sections.length; i++) ...[
+                        if (_sections[i].sectionType != SectionType.TITLE) ...[
+                          Text(_sections[i].title, style: context.text.titleLarge),
+                          const SizedBox(height: AppSpacing.sm),
+                        ],
+                        MarkdownBody(
+                          data: _sections[i].contentMarkdown,
+                          selectable: true,
+                          styleSheet: mdStyle,
                         ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  MarkdownBody(
-                    data: section.contentMarkdown,
-                    selectable: true,
-                  ),
-                  if (isLastSection) ...[
-                    const SizedBox(height: AppSpacing.xl),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        if (i < _sections.length - 1) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          const Divider(),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                      ],
+                      const SizedBox(height: AppSpacing.xl),
+                      SurfaceCard(
+                        padding: const EdgeInsets.all(AppSpacing.lg - 4),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Row(
                               children: [
-                                Icon(
-                                  _isCompleted
-                                      ? Icons.check_circle_rounded
+                                IconTile(
+                                  icon: _isCompleted
+                                      ? Icons.check_rounded
                                       : Icons.flag_rounded,
                                   color: _isCompleted
                                       ? AppColors.success
-                                      : AppColors.devops,
+                                      : AppColors.brand,
                                 ),
-                                const SizedBox(width: AppSpacing.sm),
+                                const SizedBox(width: AppSpacing.md),
                                 Expanded(
-                                  child: Text(
-                                    _isCompleted
-                                        ? 'Leçon terminée'
-                                        : 'Vous avez atteint la fin de la leçon',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _isCompleted
+                                            ? 'Leçon terminée'
+                                            : 'Fin de la leçon',
+                                        style: context.text.titleMedium,
+                                      ),
+                                      Text(
+                                        'Validez vos acquis avec les exercices pratiques.',
+                                        style: context.text.bodySmall,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: AppSpacing.md),
-                            if (!_isCompleted)
-                              ElevatedButton.icon(
-                                onPressed: _isSaving
-                                    ? null
-                                    : () => _saveProgress(markAsCompleted: true),
-                                icon: const Icon(Icons.check_rounded),
-                                label: const Text('Terminer la leçon'),
+                            if (!_isCompleted) ...[
+                              PrimaryButton(
+                                label: 'Terminer la leçon',
+                                icon: Icons.check_rounded,
+                                isLoading: _isSaving,
+                                onPressed: () =>
+                                    _saveProgress(markAsCompleted: true),
                               ),
-                            const SizedBox(height: AppSpacing.sm),
+                              const SizedBox(height: AppSpacing.sm + 2),
+                            ],
                             OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(44, 48),
-                              ),
                               onPressed: () => context.push(
                                 '/lessons/${widget.lessonId}/exercises',
                               ),
@@ -273,47 +363,10 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(44, 48),
-                      ),
-                      onPressed: _currentIndex > 0
-                          ? () => _goToSection(_currentIndex - 1)
-                          : null,
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      label: const Text('Précédent'),
-                    ),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: !isLastSection
-                          ? () => _goToSection(_currentIndex + 1)
-                          : () => context.push(
-                                '/lessons/${widget.lessonId}/exercises',
-                              ),
-                      icon: Icon(
-                        isLastSection
-                            ? Icons.quiz_rounded
-                            : Icons.arrow_forward_rounded,
-                      ),
-                      label: Text(isLastSection ? 'Exercices' : 'Suivant'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -322,4 +375,3 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     );
   }
 }
-
