@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   Timer? _scrollSaveTimer;
   LessonDetail? _lesson;
   List<LessonSection> _sections = [];
+  List<GlobalKey> _sectionKeys = [];
   double _scrollRatio = 0.0;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -100,6 +102,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     setState(() {
       _lesson = detail;
       _sections = sorted;
+      _sectionKeys = List.generate(sorted.length, (_) => GlobalKey());
       _scrollRatio = savedRatio;
       _isCompleted =
           detail.userProgress?.status == LessonProgressStatus.COMPLETED;
@@ -257,6 +260,13 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
             color: context.palette.textMuted,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Sommaire de la leçon',
+            icon: const Icon(Icons.toc_rounded),
+            onPressed: () => _showTableOfContents(context),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -291,14 +301,25 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                       Text(lesson.title, style: context.text.headlineMedium),
                       const SizedBox(height: AppSpacing.lg),
                       for (var i = 0; i < _sections.length; i++) ...[
-                        if (_sections[i].sectionType != SectionType.TITLE) ...[
-                          Text(_sections[i].title, style: context.text.titleLarge),
-                          const SizedBox(height: AppSpacing.sm),
-                        ],
-                        MarkdownBody(
-                          data: _sections[i].contentMarkdown,
-                          selectable: true,
-                          styleSheet: mdStyle,
+                        Container(
+                          key: i < _sectionKeys.length ? _sectionKeys[i] : null,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_sections[i].sectionType != SectionType.TITLE) ...[
+                                Text(_sections[i].title, style: context.text.titleLarge),
+                                const SizedBox(height: AppSpacing.sm),
+                              ],
+                              MarkdownBody(
+                                data: _sections[i].contentMarkdown,
+                                selectable: true,
+                                styleSheet: mdStyle,
+                                builders: {
+                                  'pre': _CodeBlockBuilder(context),
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                         if (i < _sections.length - 1) ...[
                           const SizedBox(height: AppSpacing.lg),
@@ -368,6 +389,101 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                   ),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTableOfContents(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
+            itemCount: _sections.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (_, index) {
+              final section = _sections[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: AppColors.brand.withValues(alpha: 0.12),
+                  child: Text(
+                    '${index + 1}',
+                    style: context.text.labelSmall?.copyWith(color: AppColors.brand),
+                  ),
+                ),
+                title: Text(section.title),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  if (index < _sectionKeys.length) {
+                    final target = _sectionKeys[index].currentContext;
+                    if (target != null) {
+                      Scrollable.ensureVisible(
+                        target,
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeOutCubic,
+                      );
+                    }
+                  }
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CodeBlockBuilder extends MarkdownElementBuilder {
+  final BuildContext parentContext;
+
+  _CodeBlockBuilder(this.parentContext);
+
+  @override
+  Widget? visitElementAfter(element, TextStyle? preferredStyle) {
+    final code = element.textContent.trimRight();
+    if (code.isEmpty) return null;
+    final ctx = parentContext;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: ctx.palette.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: ctx.palette.border),
+      ),
+      child: Stack(
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, 48, AppSpacing.md),
+            child: SelectableText(
+              code,
+              style: ctx.text.bodyMedium?.copyWith(
+                fontFamily: 'monospace',
+                height: 1.45,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: IconButton(
+              tooltip: 'Copier le code',
+              icon: Icon(Icons.copy_rounded, size: 18, color: ctx.palette.textMuted),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: code));
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Code copié dans le presse-papiers')),
+                );
+              },
             ),
           ),
         ],

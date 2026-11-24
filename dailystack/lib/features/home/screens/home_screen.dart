@@ -68,7 +68,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       body: todayAsync.when(
-        loading: () => const AppLoadingView(message: 'Préparation de votre journée...'),
+        loading: () => const HomeSkeletonView(),
         error: (err, _) => AppErrorView(message: err.toString(), onRetry: () => _refreshAll(ref)),
         data: (lesson) => RefreshIndicator(
           onRefresh: () async => _refreshAll(ref),
@@ -204,8 +204,15 @@ class _TodayLessonHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final isInProgress = lesson.status == LessonProgressStatus.IN_PROGRESS;
     final isCompleted = lesson.status == LessonProgressStatus.COMPLETED;
+    final isBackend = DomainBadge.isBackend(lesson.domainCode);
+    final gradientColors = isBackend
+        ? const [Color(0xFF0E9F6E), Color(0xFF067653)]
+        : const [Color(0xFF0B84D8), Color(0xFF075998)];
+    final shadowColor = isBackend ? AppColors.backend : AppColors.devops;
+    final progressPercent = (lesson.scrollOffsetRatio.clamp(0.0, 1.0) * 100).round();
+
     final (ctaLabel, ctaIcon) = isInProgress
-        ? ('Continuer', Icons.play_arrow_rounded)
+        ? ('Continuer ($progressPercent%)', Icons.play_arrow_rounded)
         : isCompleted
             ? ('Relire la leçon', Icons.replay_rounded)
             : ('Commencer', Icons.arrow_forward_rounded);
@@ -218,14 +225,14 @@ class _TodayLessonHero extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.lg + 4),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.brand, AppColors.brandDark],
+          colors: gradientColors,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.brand.withValues(alpha: 0.28),
+            color: shadowColor.withValues(alpha: 0.28),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -273,7 +280,7 @@ class _TodayLessonHero extends StatelessWidget {
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
-                foregroundColor: AppColors.brandDark,
+                foregroundColor: shadowColor,
               ),
               onPressed: onOpen,
               icon: Icon(ctaIcon),

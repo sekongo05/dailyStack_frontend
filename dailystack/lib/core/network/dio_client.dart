@@ -28,14 +28,22 @@ class DioClient {
     dio.interceptors.add(_AuthInterceptor(dio, storage, onSessionExpired));
   }
 
+  static String userMessage(Object? error) {
+    if (error is DioException) {
+      return mapError(error).message;
+    }
+    return userFriendlyError(error);
+  }
+
   static ApiException mapError(DioException e) {
+    final statusCode = e.response?.statusCode;
     final data = e.response?.data;
     if (data is Map<String, dynamic>) {
-      final message = data['message'] as String? ?? 'Une erreur est survenue';
+      final rawMessage = data['message'] as String?;
       final rawData = data['data'];
       return ApiException(
-        message,
-        statusCode: e.response?.statusCode,
+        sanitizeErrorMessage(rawMessage),
+        statusCode: statusCode,
         fieldErrors: rawData is Map<String, dynamic> ? rawData : null,
       );
     }
@@ -43,9 +51,45 @@ class DioClient {
         e.type == DioExceptionType.receiveTimeout ||
         e.type == DioExceptionType.sendTimeout ||
         e.type == DioExceptionType.connectionError) {
-      return ApiException('Connexion au serveur impossible. Vérifiez votre réseau.');
+      return ApiException(
+        'Connexion au serveur impossible. Vérifiez votre connexion internet et réessayez.',
+        statusCode: statusCode,
+      );
     }
-    return ApiException('Erreur réseau inattendue', statusCode: e.response?.statusCode);
+    if (statusCode == 401) {
+      return ApiException(
+        'Votre session a expiré. Veuillez vous reconnecter.',
+        statusCode: statusCode,
+      );
+    }
+    if (statusCode == 403) {
+      return ApiException(
+        'Vous n\'avez pas les autorisations nécessaires pour effectuer cette action.',
+        statusCode: statusCode,
+      );
+    }
+    if (statusCode == 404) {
+      return ApiException(
+        'L\'élément demandé est introuvable ou n\'est plus disponible.',
+        statusCode: statusCode,
+      );
+    }
+    if (statusCode == 429) {
+      return ApiException(
+        'Trop de tentatives en peu de temps. Veuillez patienter un instant.',
+        statusCode: statusCode,
+      );
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return ApiException(
+        'Le service est momentanément indisponible. Veuillez réessayer dans quelques instants.',
+        statusCode: statusCode,
+      );
+    }
+    return ApiException(
+      'Impossible de communiquer avec le serveur. Veuillez réessayer.',
+      statusCode: statusCode,
+    );
   }
 }
 

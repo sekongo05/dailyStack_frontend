@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../network/api_response.dart';
 import '../theme/app_theme.dart';
 import 'ui.dart';
 
@@ -75,6 +76,7 @@ class AppErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final safeMessage = sanitizeErrorMessage(message);
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.xl),
@@ -85,7 +87,7 @@ class AppErrorView extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             Text('Oups, un souci de chargement', style: context.text.titleLarge, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.sm),
-            Text(message, style: context.text.bodySmall, textAlign: TextAlign.center),
+            Text(safeMessage, style: context.text.bodySmall, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.lg),
             OutlinedButton.icon(
               onPressed: onRetry,
@@ -127,6 +129,89 @@ class OfflineBanner extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Bloc squelette pulsant pour les états de chargement.
+class SkeletonBox extends StatefulWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const SkeletonBox({
+    super.key,
+    this.width,
+    required this.height,
+    this.radius = AppRadius.md,
+  });
+
+  @override
+  State<SkeletonBox> createState() => _SkeletonBoxState();
+}
+
+class _SkeletonBoxState extends State<SkeletonBox> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 950),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 0.95).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: context.palette.surfaceAlt,
+          borderRadius: BorderRadius.circular(widget.radius),
+        ),
+      ),
+    );
+  }
+}
+
+/// Squelette structuré pour l'écran d'accueil pendant le chargement initial.
+class HomeSkeletonView extends StatelessWidget {
+  const HomeSkeletonView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      children: const [
+        SizedBox(height: AppSpacing.sm),
+        SkeletonBox(width: 140, height: 14),
+        SizedBox(height: AppSpacing.xs),
+        SkeletonBox(width: 210, height: 28),
+        SizedBox(height: AppSpacing.lg),
+        SkeletonBox(height: 210, radius: AppRadius.lg + 4),
+        SizedBox(height: AppSpacing.lg),
+        Row(
+          children: [
+            Expanded(child: SkeletonBox(height: 86, radius: AppRadius.lg)),
+            SizedBox(width: AppSpacing.sm),
+            Expanded(child: SkeletonBox(height: 86, radius: AppRadius.lg)),
+            SizedBox(width: AppSpacing.sm),
+            Expanded(child: SkeletonBox(height: 86, radius: AppRadius.lg)),
+          ],
+        ),
+        SizedBox(height: AppSpacing.lg),
+        SkeletonBox(width: 170, height: 18),
+        SizedBox(height: AppSpacing.sm),
+        SkeletonBox(height: 84, radius: AppRadius.lg),
+        SizedBox(height: AppSpacing.sm),
+        SkeletonBox(height: 84, radius: AppRadius.lg),
+      ],
     );
   }
 }

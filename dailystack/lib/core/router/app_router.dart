@@ -130,57 +130,109 @@ class _MainShell extends ConsumerWidget {
 
   const _MainShell({required this.navigationShell});
 
+  static const _destinations = [
+    (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Accueil'),
+    (icon: Icons.auto_stories_outlined, selectedIcon: Icons.auto_stories_rounded, label: 'Apprendre'),
+    (icon: Icons.bolt_outlined, selectedIcon: Icons.bolt_rounded, label: 'Veille'),
+    (icon: Icons.bar_chart_outlined, selectedIcon: Icons.bar_chart_rounded, label: 'Progrès'),
+    (icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Profil'),
+  ];
+
+  void _onSelect(int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncState = ref.watch(offlineSyncProvider);
+    final isWide = MediaQuery.sizeOf(context).width >= 840;
 
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+    final content = SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          if (!syncState.isOnline)
+            OfflineBanner(pendingSync: syncState.pendingCount > 0),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: navigationShell,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (isWide) {
+      return Scaffold(
+        body: Row(
           children: [
-            if (!syncState.isOnline)
-              OfflineBanner(pendingSync: syncState.pendingCount > 0),
-            Expanded(child: navigationShell),
+            NavigationRail(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: _onSelect,
+              labelType: NavigationRailLabelType.all,
+              backgroundColor: context.colors.surface,
+              indicatorColor: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.brand.withValues(alpha: 0.25)
+                  : AppColors.brandSoft,
+              leading: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.brand, AppColors.brandDark],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.layers_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(height: 6),
+                    Text('DailyStak', style: context.text.labelSmall),
+                  ],
+                ),
+              ),
+              destinations: [
+                for (final d in _destinations)
+                  NavigationRailDestination(
+                    icon: Icon(d.icon),
+                    selectedIcon: Icon(d.selectedIcon, color: AppColors.brand),
+                    label: Text(d.label),
+                  ),
+              ],
+            ),
+            VerticalDivider(width: 1, thickness: 1, color: context.palette.border),
+            Expanded(child: content),
           ],
         ),
-      ),
+      );
+    }
+
+    return Scaffold(
+      body: content,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           border: Border(top: BorderSide(color: context.palette.border)),
         ),
         child: NavigationBar(
           selectedIndex: navigationShell.currentIndex,
-          onDestinationSelected: (index) => navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          ),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Accueil',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.auto_stories_outlined),
-              selectedIcon: Icon(Icons.auto_stories_rounded),
-              label: 'Apprendre',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.bolt_outlined),
-              selectedIcon: Icon(Icons.bolt_rounded),
-              label: 'Veille',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.bar_chart_outlined),
-              selectedIcon: Icon(Icons.bar_chart_rounded),
-              label: 'Progrès',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profil',
-            ),
+          onDestinationSelected: _onSelect,
+          destinations: [
+            for (final d in _destinations)
+              NavigationDestination(
+                icon: Icon(d.icon),
+                selectedIcon: Icon(d.selectedIcon),
+                label: d.label,
+              ),
           ],
         ),
       ),

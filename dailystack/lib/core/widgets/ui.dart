@@ -103,14 +103,16 @@ class IconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? (Color.lerp(color, Colors.white, 0.28) ?? color) : color;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: isDark ? 0.20 : 0.12),
         borderRadius: BorderRadius.circular(size * 0.32),
       ),
-      child: Icon(icon, color: color, size: size * 0.5),
+      child: Icon(icon, color: fg, size: size * 0.5),
     );
   }
 }
@@ -125,22 +127,24 @@ class TagPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? (Color.lerp(color, Colors.white, 0.28) ?? color) : color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: isDark ? 0.20 : 0.12),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: color, semanticLabel: label),
+            Icon(icon, size: 14, color: fg, semanticLabel: label),
             const SizedBox(width: 5),
           ],
           Text(
             label,
-            style: context.text.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
+            style: context.text.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w700),
           ),
         ],
       ),

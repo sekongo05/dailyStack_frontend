@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dailystack/core/theme/app_theme.dart';
 import 'package:dailystack/core/widgets/domain_badge.dart';
 import 'package:dailystack/core/widgets/state_views.dart';
 import 'package:dailystack/features/practice/models/practice_models.dart';
@@ -67,5 +68,38 @@ void main() {
       find.text('Données stockées localement - en attente de synchronisation'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('AppErrorView hides technical exception details', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: AppErrorView(
+            message: "FormatException: Unexpected character (at character 1)",
+            onRetry: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('FormatException'), findsNothing);
+    expect(
+      find.text('Une erreur technique est survenue. Veuillez réessayer plus tard.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('HomeSkeletonView renders loading placeholders', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: const Scaffold(
+          body: HomeSkeletonView(),
+        ),
+      ),
+    );
+
+    expect(find.byType(SkeletonBox), findsWidgets);
   });
 }
