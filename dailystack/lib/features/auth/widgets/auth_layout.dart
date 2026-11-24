@@ -22,6 +22,7 @@ class AuthLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCompact = MediaQuery.sizeOf(context).width < 480;
     final glowColor = isDark
         ? AppColors.brandBright.withValues(alpha: 0.14)
         : AppColors.brand.withValues(alpha: 0.09);
@@ -49,9 +50,10 @@ class AuthLayout extends StatelessWidget {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.xl,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCompact ? AppSpacing.md : AppSpacing.lg,
+                  vertical: isCompact ? AppSpacing.md : AppSpacing.xl,
                 ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 440),
@@ -60,23 +62,30 @@ class AuthLayout extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const AppLogo(size: 52),
+                          AppLogo(size: isCompact ? 46 : 52),
                           const SizedBox(width: AppSpacing.md),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('DailyStack', style: context.text.titleLarge),
-                              const SizedBox(height: 2),
-                              TagPill(
-                                label: badge,
-                                color: AppColors.brand,
-                              ),
-                            ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('DailyStack', style: context.text.titleLarge),
+                                const SizedBox(height: 2),
+                                TagPill(
+                                  label: badge,
+                                  color: AppColors.brand,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Text(title, style: context.text.headlineLarge),
+                      SizedBox(height: isCompact ? AppSpacing.lg : AppSpacing.xl),
+                      Text(
+                        title,
+                        style: isCompact
+                            ? context.text.headlineMedium
+                            : context.text.headlineLarge,
+                      ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         subtitle,
@@ -86,7 +95,7 @@ class AuthLayout extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       SurfaceCard(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        padding: EdgeInsets.all(isCompact ? AppSpacing.md + 4 : AppSpacing.lg),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: children,

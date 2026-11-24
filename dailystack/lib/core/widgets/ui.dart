@@ -12,7 +12,7 @@ class ScreenHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.md, AppSpacing.sm),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm + 4, AppSpacing.md, AppSpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -169,16 +169,26 @@ class StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 400;
     return SurfaceCard(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isCompact ? 12 : 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconTile(icon: icon, color: color, size: 36),
-          const SizedBox(height: AppSpacing.sm + 4),
-          Text(value, style: context.text.headlineSmall),
+          IconTile(icon: icon, color: color, size: isCompact ? 32 : 36),
+          SizedBox(height: isCompact ? AppSpacing.sm : AppSpacing.sm + 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: context.text.headlineSmall),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: context.text.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            label,
+            style: context.text.bodySmall?.copyWith(fontSize: isCompact ? 11.5 : null),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

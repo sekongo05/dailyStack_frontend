@@ -127,7 +127,7 @@ class _Greeting extends ConsumerWidget {
     final name = user?.username;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.sm, 0),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm + 4, AppSpacing.xs, 0),
       child: Row(
         children: [
           Expanded(
@@ -243,7 +243,9 @@ class _TodayLessonHero extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(AppSpacing.lg - 4),
+      padding: EdgeInsets.all(
+        MediaQuery.sizeOf(context).width < 400 ? AppSpacing.md : AppSpacing.lg - 4,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -341,7 +343,7 @@ class _StatsRow extends ConsumerWidget {
             label: 'Jours de suite',
           ),
         ),
-        const SizedBox(width: AppSpacing.sm + 2),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: StatTile(
             icon: Icons.menu_book_rounded,
@@ -350,7 +352,7 @@ class _StatsRow extends ConsumerWidget {
             label: 'Leçons',
           ),
         ),
-        const SizedBox(width: AppSpacing.sm + 2),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: StatTile(
             icon: Icons.verified_rounded,

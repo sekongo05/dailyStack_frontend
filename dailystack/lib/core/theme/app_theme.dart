@@ -266,20 +266,21 @@ class AppTheme {
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        height: 68,
+        height: 64,
         indicatorColor: isDark ? AppColors.brand.withValues(alpha: 0.25) : AppColors.brandSoft,
         indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            size: 24,
-            color: selected ? AppColors.brand : palette.textMuted,
+            size: 22,
+            color: selected ? (isDark ? AppColors.brandBright : AppColors.brand) : palette.textMuted,
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return textTheme.labelSmall?.copyWith(
+            fontSize: 11,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? textPrimary : palette.textMuted,
           );
