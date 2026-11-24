@@ -38,20 +38,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       _error = null;
     });
     try {
-      final profile = await ref.read(authServiceProvider).getMe();
+      final authService = ref.read(authServiceProvider);
+      final profile = await authService.getMe();
+      final prefs = await authService.getPreferences();
       if (!mounted) return;
       ref.read(currentUserProvider.notifier).state = profile;
-      final prefs = profile.preferences;
       setState(() {
         _profile = profile;
-        if (prefs != null) {
-          _theme = prefs.theme;
-          _textSize = prefs.textSize;
-          _reminderTime = prefs.dailyReminderTime;
-          _notifyDailyLesson = prefs.notifyDailyLesson;
-          _notifyReviews = prefs.notifyReviews;
-          _notifyImportantNews = prefs.notifyImportantNews;
-        }
+        _theme = prefs.theme;
+        _textSize = prefs.textSize;
+        _reminderTime = prefs.dailyReminderTime;
+        _notifyDailyLesson = prefs.notifyDailyLesson;
+        _notifyReviews = prefs.notifyReviews;
+        _notifyImportantNews = prefs.notifyImportantNews;
         _isLoading = false;
       });
     } catch (e) {

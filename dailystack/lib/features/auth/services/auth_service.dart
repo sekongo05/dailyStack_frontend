@@ -8,6 +8,7 @@ class AuthService {
   final DioClient _client;
   final LocalDatabase? _localDb;
 
+  // ignore: prefer_initializing_formals
   AuthService(this._client, {LocalDatabase? localDb}) : _localDb = localDb;
 
   Future<AuthResponse> register({
@@ -73,7 +74,11 @@ class AuthService {
         response.data as Map<String, dynamic>,
         (data) => UserPreferences.fromJson(data as Map<String, dynamic>),
       );
-      return apiRes.data!;
+      final prefs = apiRes.data;
+      if (prefs == null) {
+        throw Exception('Préférences utilisateur indisponibles.');
+      }
+      return prefs;
     } on DioException catch (e) {
       throw DioClient.mapError(e);
     }

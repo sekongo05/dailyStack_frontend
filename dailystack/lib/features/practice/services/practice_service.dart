@@ -32,8 +32,8 @@ class PracticeService {
       final response = await _client.dio.post(
         '/exercises/$exerciseId/submit',
         data: {
-          if (selectedOptionId != null) 'selectedOptionId': selectedOptionId,
-          if (submittedText != null) 'submittedText': submittedText,
+          'selectedOptionId': ?selectedOptionId,
+          'submittedText': ?submittedText,
         },
       );
       final apiRes = ApiResponse.fromJson(

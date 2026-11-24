@@ -44,9 +44,9 @@ class LessonService {
       final response = await _client.dio.post(
         '/lessons/$lessonId/progress',
         data: {
-          if (lastReadSectionIndex != null) 'lastReadSectionIndex': lastReadSectionIndex,
-          if (scrollOffsetRatio != null) 'scrollOffsetRatio': scrollOffsetRatio,
-          if (markAsCompleted != null) 'markAsCompleted': markAsCompleted,
+          'lastReadSectionIndex': ?lastReadSectionIndex,
+          'scrollOffsetRatio': ?scrollOffsetRatio,
+          'markAsCompleted': ?markAsCompleted,
         },
       );
       final apiRes = ApiResponse.fromJson(
@@ -64,8 +64,8 @@ class LessonService {
       final response = await _client.dio.get(
         '/tracks',
         queryParameters: {
-          if (domain != null) 'domain': domain,
-          if (level != null) 'level': level,
+          'domain': ?domain,
+          'level': ?level,
         },
       );
       final apiRes = ApiResponse.fromJson(

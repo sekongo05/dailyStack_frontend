@@ -41,7 +41,29 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      final cachedList = await ref.read(localDatabaseProvider).getCachedNews();
+      final cachedSummary =
+          cachedList.where((n) => n.id == widget.newsId).firstOrNull;
       if (!mounted) return;
+      if (cachedSummary != null) {
+        setState(() {
+          _detail = TechNewsDetail(
+            id: cachedSummary.id,
+            title: cachedSummary.title,
+            category: cachedSummary.category,
+            targetTechnology: cachedSummary.targetTechnology,
+            summary: cachedSummary.summary,
+            importance: cachedSummary.importance,
+            publishedDate: cachedSummary.publishedDate,
+            lastVerifiedDate: cachedSummary.lastVerifiedDate,
+            aiGenerated: cachedSummary.aiGenerated,
+            bookmarked: cachedSummary.bookmarked,
+            originalSourceUrl: '',
+          );
+          _isLoading = false;
+        });
+        return;
+      }
       setState(() {
         _error = e.toString();
         _isLoading = false;
