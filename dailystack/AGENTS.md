@@ -2,6 +2,11 @@
 
 These rules apply automatically to every agent (solo or `/teamwork` swarm) working in `/Users/macbookairm1/Desktop/DailyStaskFrontend/dailystack`.
 
+## Autonomous Execution (No Unnecessary Confirmation)
+- Proceed autonomously from design through implementation, `flutter analyze`, `flutter test`, and commit/push on `develop` **without** asking the user for permission at intermediate steps.
+- Resolve analyzer warnings, widget/unit test failures, or model mismatches directly instead of stopping to ask.
+- Only ask the user if an action targets `main` (production release) or hits a real UX/product ambiguity not covered by `Cahier_des_charges_DailyStack_V3.md` or `API_INTEGRATION_FRONTEND.md`.
+
 ## Git & Branch Discipline
 - Always work, commit, and push on the `develop` branch (`git-commit-push-dev`).
 - **Never** push directly to `main` unless the user explicitly asks for a production release (`senior-flutter-release`).
