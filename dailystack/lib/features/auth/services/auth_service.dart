@@ -97,6 +97,47 @@ class AuthService {
     }
   }
 
+  Future<String> forgotPassword(String email) async {
+    try {
+      final response = await _client.dio.post(
+        '/auth/forgot-password',
+        data: {'email': email},
+      );
+      final apiRes = ApiResponse<void>.fromJson(
+        response.data as Map<String, dynamic>,
+        null,
+      );
+      return apiRes.message ??
+          'Si un compte existe avec cette adresse e-mail, un code de réinitialisation a été envoyé.';
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
+  Future<String> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _client.dio.post(
+        '/auth/reset-password',
+        data: {
+          'email': email,
+          'code': code,
+          'newPassword': newPassword,
+        },
+      );
+      final apiRes = ApiResponse<void>.fromJson(
+        response.data as Map<String, dynamic>,
+        null,
+      );
+      return apiRes.message ?? 'Votre mot de passe a été réinitialisé avec succès.';
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
   Future<void> logout() async {
     await _client.storage.deleteAll();
     await _localDb?.clearAll();

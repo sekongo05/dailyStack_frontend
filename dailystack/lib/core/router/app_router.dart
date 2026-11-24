@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/state_views.dart';
+import '../widgets/ui.dart';
+import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/profile_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
@@ -31,6 +33,10 @@ class AppRouter {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/register',
@@ -185,19 +191,9 @@ class _MainShell extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                 child: Column(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.brand, AppColors.brandDark],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.layers_rounded, color: Colors.white, size: 22),
-                    ),
+                    const AppLogo(size: 40),
                     const SizedBox(height: 6),
-                    Text('DailyStak', style: context.text.labelSmall),
+                    Text('DailyStack', style: context.text.labelSmall),
                   ],
                 ),
               ),

@@ -317,7 +317,7 @@ class InlineError extends StatelessWidget {
   }
 }
 
-/// Logo officiel DailyStack avec coins arrondis proportionnels et ombre douce.
+/// Logo géométrique DailyStack : empilement de couches évoquant la progression quotidienne.
 class AppLogo extends StatelessWidget {
   final double size;
 
@@ -325,30 +325,93 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(size * 0.24);
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brand.withValues(alpha: 0.22),
-            blurRadius: size * 0.28,
-            offset: Offset(0, size * 0.1),
+    final radius = BorderRadius.circular(size * 0.26);
+    return Semantics(
+      label: 'Logo DailyStack',
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0F172A), Color(0xFF080D1A)],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: Image.asset(
-          'assets/images/app_logo.png',
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          semanticLabel: 'Logo DailyStack',
+          border: Border.all(
+            color: AppColors.brandBright.withValues(alpha: 0.35),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brand.withValues(alpha: 0.28),
+              blurRadius: size * 0.32,
+              offset: Offset(0, size * 0.1),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: CustomPaint(
+            size: Size(size, size),
+            painter: _StackLogoPainter(),
+          ),
         ),
       ),
     );
   }
+}
+
+class _StackLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    void drawLayer({
+      required double topY,
+      required double halfW,
+      required double halfH,
+      required Paint paint,
+    }) {
+      final cx = w * 0.5;
+      final path = Path()
+        ..moveTo(cx, topY)
+        ..lineTo(cx + halfW, topY + halfH)
+        ..lineTo(cx, topY + halfH * 2)
+        ..lineTo(cx - halfW, topY + halfH)
+        ..close();
+      canvas.drawPath(path, paint);
+    }
+
+    // Couche inférieure (socle bleu nuit / cyan discret)
+    drawLayer(
+      topY: h * 0.50,
+      halfW: w * 0.30,
+      halfH: h * 0.13,
+      paint: Paint()..color = const Color(0xFF0EA5E9).withValues(alpha: 0.38),
+    );
+
+    // Couche intermédiaire (cyan électrique)
+    drawLayer(
+      topY: h * 0.36,
+      halfW: w * 0.30,
+      halfH: h * 0.13,
+      paint: Paint()..color = const Color(0xFF06B6D4).withValues(alpha: 0.78),
+    );
+
+    // Couche supérieure (dégradé cyan -> émeraude)
+    drawLayer(
+      topY: h * 0.22,
+      halfW: w * 0.30,
+      halfH: h * 0.13,
+      paint: Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFF22D3EE), Color(0xFF10B981)],
+        ).createShader(Rect.fromLTWH(w * 0.2, h * 0.2, w * 0.6, h * 0.3)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

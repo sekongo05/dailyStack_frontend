@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dailystack/core/theme/app_theme.dart';
 import 'package:dailystack/core/widgets/domain_badge.dart';
 import 'package:dailystack/core/widgets/state_views.dart';
+import 'package:dailystack/features/auth/screens/forgot_password_screen.dart';
+import 'package:dailystack/features/auth/screens/login_screen.dart';
 import 'package:dailystack/features/practice/models/practice_models.dart';
 import 'package:dailystack/features/practice/widgets/mastery_badge.dart';
 import 'package:dailystack/main.dart';
@@ -101,5 +103,31 @@ void main() {
     );
 
     expect(find.byType(SkeletonBox), findsWidgets);
+  });
+
+  testWidgets('LoginScreen displays forgot password action', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const LoginScreen(),
+        ),
+      ),
+    );
+
+    expect(find.text('Mot de passe oublié ?'), findsOneWidget);
+  });
+
+  testWidgets('ForgotPasswordScreen renders email request step', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const ForgotPasswordScreen(),
+        ),
+      ),
+    );
+
+    expect(find.text('Envoyer le code'), findsOneWidget);
   });
 }

@@ -5,6 +5,7 @@ import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
+import '../widgets/auth_layout.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -62,90 +63,75 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: AppLogo(size: 64),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text('Bon retour', style: context.text.displaySmall),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Connectez-vous pour reprendre votre progression Backend & DevOps.',
-                    style: context.text.bodyMedium?.copyWith(
-                      color: context.palette.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  if (_errorMessage != null) ...[
-                    InlineError(message: _errorMessage!),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: 'Adresse e-mail',
-                      prefixIcon: const Icon(Icons.mail_outline_rounded),
-                      errorText: _fieldErrors?['email'] as String?,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _isLoading ? null : _submit(),
-                    decoration: InputDecoration(
-                      labelText: 'Mot de passe',
-                      prefixIcon: const Icon(Icons.lock_outline_rounded),
-                      suffixIcon: IconButton(
-                        tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
-                        onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                      ),
-                      errorText: _fieldErrors?['password'] as String?,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  PrimaryButton(
-                    label: 'Se connecter',
-                    isLoading: _isLoading,
-                    onPressed: _submit,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Pas encore de compte ?', style: context.text.bodySmall),
-                      TextButton(
-                        onPressed: () => context.go('/register'),
-                        child: const Text('S\'inscrire'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+    return AuthLayout(
+      badge: 'MICRO-LEARNING TECH',
+      title: 'Bon retour',
+      subtitle: 'Connectez-vous pour reprendre votre progression Backend & DevOps.',
+      children: [
+        if (_errorMessage != null) ...[
+          InlineError(message: _errorMessage!),
+          const SizedBox(height: AppSpacing.md),
+        ],
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            labelText: 'Adresse e-mail',
+            prefixIcon: const Icon(Icons.mail_outline_rounded),
+            errorText: _fieldErrors?['email'] as String?,
           ),
         ),
-      ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _isLoading ? null : _submit(),
+          decoration: InputDecoration(
+            labelText: 'Mot de passe',
+            prefixIcon: const Icon(Icons.lock_outline_rounded),
+            suffixIcon: IconButton(
+              tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
+              onPressed: () => setState(
+                () => _obscurePassword = !_obscurePassword,
+              ),
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            ),
+            errorText: _fieldErrors?['password'] as String?,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => context.push('/forgot-password'),
+            child: const Text('Mot de passe oublié ?'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        PrimaryButton(
+          label: 'Se connecter',
+          isLoading: _isLoading,
+          onPressed: _submit,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('Pas encore de compte ?', style: context.text.bodySmall),
+            TextButton(
+              onPressed: () => context.go('/register'),
+              child: const Text('S\'inscrire'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

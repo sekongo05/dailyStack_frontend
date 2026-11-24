@@ -5,36 +5,37 @@ import 'package:google_fonts/google_fonts.dart';
 class AppColors {
   AppColors._();
 
-  // Marque
-  static const Color brand = Color(0xFF5B5BD6);
-  static const Color brandDark = Color(0xFF4343B8);
-  static const Color brandSoft = Color(0xFFEDEDFC);
+  // Marque (Tech Pro : Bleu Nuit + Cyan / Émeraude)
+  static const Color brand = Color(0xFF0891B2);
+  static const Color brandBright = Color(0xFF22D3EE);
+  static const Color brandDark = Color(0xFF0E7490);
+  static const Color brandSoft = Color(0xFFE0F7FA);
 
   // Domaines
-  static const Color backend = Color(0xFF0E9F6E);
-  static const Color devops = Color(0xFF0B84D8);
+  static const Color backend = Color(0xFF10B981);
+  static const Color devops = Color(0xFF0EA5E9);
 
   // Sémantiques
-  static const Color success = Color(0xFF16A34A);
-  static const Color error = Color(0xFFDC2626);
-  static const Color warning = Color(0xFFEA8A0C);
+  static const Color success = Color(0xFF10B981);
+  static const Color error = Color(0xFFEF4444);
+  static const Color warning = Color(0xFFF59E0B);
   static const Color streak = Color(0xFFF97316);
 
-  // Neutres clairs (tons chauds, esprit Notion)
-  static const Color lightBackground = Color(0xFFFAFAF9);
+  // Neutres clairs (frais & contrastés, esprit Vercel)
+  static const Color lightBackground = Color(0xFFF8FAFC);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceAlt = Color(0xFFF4F4F2);
-  static const Color lightTextPrimary = Color(0xFF1C1917);
-  static const Color lightTextSecondary = Color(0xFF78716C);
-  static const Color lightBorder = Color(0xFFE7E5E4);
+  static const Color lightSurfaceAlt = Color(0xFFF1F5F9);
+  static const Color lightTextPrimary = Color(0xFF0F172A);
+  static const Color lightTextSecondary = Color(0xFF64748B);
+  static const Color lightBorder = Color(0xFFE2E8F0);
 
-  // Neutres sombres
-  static const Color darkBackground = Color(0xFF111113);
-  static const Color darkSurface = Color(0xFF1B1B1F);
-  static const Color darkSurfaceAlt = Color(0xFF242429);
-  static const Color darkTextPrimary = Color(0xFFF4F4F5);
-  static const Color darkTextSecondary = Color(0xFFA1A1AA);
-  static const Color darkBorder = Color(0xFF2E2E34);
+  // Neutres sombres (bleu nuit profond, esprit Linear)
+  static const Color darkBackground = Color(0xFF080D1A);
+  static const Color darkSurface = Color(0xFF0F172A);
+  static const Color darkSurfaceAlt = Color(0xFF162033);
+  static const Color darkTextPrimary = Color(0xFFF8FAFC);
+  static const Color darkTextSecondary = Color(0xFF94A3B8);
+  static const Color darkBorder = Color(0xFF1E293B);
 }
 
 class AppSpacing {
@@ -223,22 +224,25 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: palette.surfaceAlt,
+        fillColor: isDark ? AppColors.darkSurfaceAlt : AppColors.lightSurface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         hintStyle: textTheme.bodyMedium?.copyWith(color: palette.textMuted),
         labelStyle: textTheme.bodyMedium?.copyWith(color: palette.textMuted),
         prefixIconColor: palette.textMuted,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+          borderSide: BorderSide(
+            color: isDark ? AppColors.brandBright : AppColors.brand,
+            width: 1.5,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),

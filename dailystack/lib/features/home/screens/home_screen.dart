@@ -205,10 +205,11 @@ class _TodayLessonHero extends StatelessWidget {
     final isInProgress = lesson.status == LessonProgressStatus.IN_PROGRESS;
     final isCompleted = lesson.status == LessonProgressStatus.COMPLETED;
     final isBackend = DomainBadge.isBackend(lesson.domainCode);
+    final accentColor = isBackend ? AppColors.backend : AppColors.devops;
     final gradientColors = isBackend
-        ? const [Color(0xFF0E9F6E), Color(0xFF067653)]
-        : const [Color(0xFF0B84D8), Color(0xFF075998)];
-    final shadowColor = isBackend ? AppColors.backend : AppColors.devops;
+        ? const [Color(0xFF0F172A), Color(0xFF0A2E26)]
+        : const [Color(0xFF0F172A), Color(0xFF0A273D)];
+    final shadowColor = accentColor;
     final progressPercent = (lesson.scrollOffsetRatio.clamp(0.0, 1.0) * 100).round();
 
     final (ctaLabel, ctaIcon) = isInProgress
@@ -230,9 +231,13 @@ class _TodayLessonHero extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: gradientColors,
         ),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.45),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: shadowColor.withValues(alpha: 0.28),
+            color: shadowColor.withValues(alpha: 0.18),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -279,8 +284,8 @@ class _TodayLessonHero extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: shadowColor,
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
               ),
               onPressed: onOpen,
               icon: Icon(ctaIcon),

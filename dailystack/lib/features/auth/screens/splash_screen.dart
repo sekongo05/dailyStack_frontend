@@ -46,26 +46,57 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AppLogo(size: 88),
-            const SizedBox(height: AppSpacing.md),
-            Text('DailyStack', style: context.text.headlineLarge),
-            const SizedBox(height: AppSpacing.xs),
-            Text('Apprendre un peu chaque jour', style: context.text.bodySmall),
-            const SizedBox(height: AppSpacing.lg),
-            const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.8,
-                strokeCap: StrokeCap.round,
+      backgroundColor: AppColors.darkBackground,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -0.2),
+                  radius: 0.9,
+                  colors: [
+                    AppColors.brandBright.withValues(alpha: 0.16),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AppLogo(size: 88),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'DailyStack',
+                  style: context.text.headlineLarge?.copyWith(
+                    color: AppColors.darkTextPrimary,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Backend · DevOps · Veille Tech',
+                  style: context.text.bodySmall?.copyWith(
+                    color: AppColors.darkTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.6,
+                    strokeCap: StrokeCap.round,
+                    color: AppColors.brandBright,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
