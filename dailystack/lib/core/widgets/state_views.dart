@@ -143,18 +143,19 @@ class OfflineBanner extends StatelessWidget {
           Icon(
             isOnline ? Icons.sync_rounded : Icons.cloud_off_rounded,
             size: 18,
-            color: AppColors.warning,
+            color: context.warningFg,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               label,
-              style: context.text.labelMedium,
+              style: context.text.labelMedium?.copyWith(color: context.warningFg),
             ),
           ),
           if (isOnline && hasPending && !isSyncing && onSyncNow != null)
             TextButton(
               style: TextButton.styleFrom(
+                foregroundColor: context.warningFg,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 minimumSize: const Size(44, 36),
               ),

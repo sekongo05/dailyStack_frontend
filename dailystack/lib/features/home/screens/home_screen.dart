@@ -263,23 +263,56 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   const SizedBox(height: AppSpacing.sm),
                   const PwaInstallBanner(),
-                  _TodayLessonHero(
-                    lesson: lesson,
-                    onOpen: () async {
-                      await context.push('/lessons/${lesson.id}');
-                      await _refreshAll(ref);
-                    },
-                  ),
-                  if (tomorrowPreview != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    _TomorrowPreviewCard(
-                      lesson: tomorrowPreview,
-                      isOfflineReady: isTomorrowCached,
-                      onTap: () async {
-                        await context.push('/lessons/${tomorrowPreview.id}');
+                  if (tomorrowPreview != null &&
+                      MediaQuery.sizeOf(context).width >= 840)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _TodayLessonHero(
+                            lesson: lesson,
+                            onOpen: () async {
+                              await context.push('/lessons/${lesson.id}');
+                              await _refreshAll(ref);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          flex: 2,
+                          child: _TomorrowPreviewCard(
+                            lesson: tomorrowPreview,
+                            isOfflineReady: isTomorrowCached,
+                            onTap: () async {
+                              await context.push(
+                                '/lessons/${tomorrowPreview.id}',
+                              );
+                              await _refreshAll(ref);
+                            },
+                          ),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    _TodayLessonHero(
+                      lesson: lesson,
+                      onOpen: () async {
+                        await context.push('/lessons/${lesson.id}');
                         await _refreshAll(ref);
                       },
                     ),
+                    if (tomorrowPreview != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _TomorrowPreviewCard(
+                        lesson: tomorrowPreview,
+                        isOfflineReady: isTomorrowCached,
+                        onTap: () async {
+                          await context.push('/lessons/${tomorrowPreview.id}');
+                          await _refreshAll(ref);
+                        },
+                      ),
+                    ],
                   ],
                   const SizedBox(height: AppSpacing.lg),
                   _StatsRow(summary: bootstrap?.progressSummary),

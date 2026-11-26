@@ -26,7 +26,7 @@ class AppColors {
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightSurfaceAlt = Color(0xFFF1F5F9);
   static const Color lightTextPrimary = Color(0xFF0F172A);
-  static const Color lightTextSecondary = Color(0xFF64748B);
+  static const Color lightTextSecondary = Color(0xFF475569);
   static const Color lightBorder = Color(0xFFE2E8F0);
 
   // Neutres sombres (bleu nuit profond, esprit Linear)
@@ -107,6 +107,9 @@ extension AppThemeContext on BuildContext {
   AppPalette get palette => Theme.of(this).extension<AppPalette>()!;
   TextTheme get text => Theme.of(this).textTheme;
   ColorScheme get colors => Theme.of(this).colorScheme;
+  Color get warningFg => Theme.of(this).brightness == Brightness.dark
+      ? AppColors.warning
+      : const Color(0xFFB45309);
 }
 
 class AppTheme {
