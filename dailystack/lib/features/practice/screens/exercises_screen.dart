@@ -8,8 +8,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ide_code_block.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
+import '../../home/screens/home_screen.dart';
+import '../../learning/screens/tracks_screen.dart';
 import '../models/practice_models.dart';
 import '../widgets/mastery_badge.dart';
+import 'progress_screen.dart';
 
 String sanitizeQuizMarkdown(String raw) {
   if (raw.isEmpty) return raw;
@@ -46,6 +49,8 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
   int _earnedPoints = 0;
   int _correctCount = 0;
   bool _sessionFinished = false;
+  bool _lessonValidated = false;
+  bool _isValidatingLesson = false;
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _error;
@@ -190,6 +195,43 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
       });
     } else {
       setState(() => _sessionFinished = true);
+      _finalizeLessonIfPassed();
+    }
+  }
+
+  Future<void> _finalizeLessonIfPassed() async {
+    if (_exercises.isEmpty) return;
+    final ratio = _correctCount / _exercises.length;
+    if (ratio < 0.60) return;
+
+    setState(() => _isValidatingLesson = true);
+    try {
+      await ref.read(lessonServiceProvider).updateProgress(
+            lessonId: widget.lessonId,
+            lastReadSectionIndex: 7,
+            scrollOffsetRatio: 1.0,
+            markAsCompleted: true,
+          );
+      if (!mounted) return;
+      ref.invalidate(todayLessonProvider);
+      ref.read(homeBootstrapProvider.notifier).refresh();
+      ref.read(tracksNotifierProvider.notifier).loadTracks();
+      ref.read(progressSummaryProvider.notifier).refresh();
+      setState(() => _lessonValidated = true);
+    } catch (_) {
+      await ref.read(offlineSyncProvider.notifier).queueProgress(
+            lessonId: widget.lessonId,
+            lastReadSectionIndex: 7,
+            scrollOffsetRatio: 1.0,
+            status: 'COMPLETED',
+          );
+      if (mounted) {
+        setState(() => _lessonValidated = true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isValidatingLesson = false);
+      }
     }
   }
 
@@ -203,6 +245,8 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
       _result = null;
       _earnedPoints = 0;
       _correctCount = 0;
+      _lessonValidated = false;
+      _isValidatingLesson = false;
       _sessionFinished = false;
     });
   }
@@ -746,8 +790,8 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
     final ratio =
         _exercises.isNotEmpty ? _correctCount / _exercises.length : 1.0;
     final percent = (ratio * 100).round();
-    final isGreat = ratio >= 0.75;
-    final accent = isGreat ? AppColors.success : AppColors.brand;
+    final passed = ratio >= 0.60;
+    final accent = passed ? AppColors.success : AppColors.warning;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Bilan des défis')),
@@ -774,9 +818,11 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Text(
-                    isGreat
-                        ? 'Excellent travail !'
-                        : 'Belle progression, continuez !',
+                    passed
+                        ? (_lessonValidated
+                            ? 'Leçon validée avec succès !'
+                            : 'Excellent travail !')
+                        : 'Score insuffisant pour valider (60 % requis)',
                     style: context.text.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -788,21 +834,42 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  if (_isValidatingLesson) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const LinearProgressIndicator(),
+                  ],
                   const SizedBox(height: AppSpacing.xl),
-                  PrimaryButton(
-                    label: 'Terminer',
-                    icon: Icons.check_rounded,
-                    onPressed: () => context.pop(),
-                  ),
-                  const SizedBox(height: AppSpacing.sm + 2),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _restartQuiz,
-                      icon: const Icon(Icons.replay_rounded),
-                      label: const Text('Refaire les défis pour consolider'),
+                  if (passed) ...[
+                    PrimaryButton(
+                      label: 'Terminer',
+                      icon: Icons.check_rounded,
+                      onPressed: () => context.pop(),
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.sm + 2),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _restartQuiz,
+                        icon: const Icon(Icons.replay_rounded),
+                        label: const Text('Refaire les défis pour consolider'),
+                      ),
+                    ),
+                  ] else ...[
+                    PrimaryButton(
+                      label: 'Refaire la série pour valider',
+                      icon: Icons.replay_rounded,
+                      onPressed: _restartQuiz,
+                    ),
+                    const SizedBox(height: AppSpacing.sm + 2),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => context.pop(),
+                        icon: const Icon(Icons.menu_book_outlined),
+                        label: const Text('Relire la leçon'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

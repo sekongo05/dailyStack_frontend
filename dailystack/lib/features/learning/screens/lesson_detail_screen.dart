@@ -35,7 +35,6 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   int _currentCardIndex = 0;
   String? _readingModePreference; // 'cards' | 'scroll'
   bool _isLoading = true;
-  bool _isSaving = false;
   bool _isCompleted = false;
   String? _error;
 
@@ -230,7 +229,6 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
 
   Future<void> _saveProgress({bool markAsCompleted = false}) async {
     if (_sections.isEmpty) return;
-    if (markAsCompleted) setState(() => _isSaving = true);
 
     final ratio = double.parse(
       (markAsCompleted ? 1.0 : _scrollRatio).toStringAsFixed(2),
@@ -276,10 +274,6 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
             ),
           ),
         );
-      }
-    } finally {
-      if (mounted && markAsCompleted) {
-        setState(() => _isSaving = false);
       }
     }
   }
@@ -771,7 +765,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
           Row(
             children: [
               IconTile(
-                icon: _isCompleted ? Icons.check_rounded : Icons.flag_rounded,
+                icon: _isCompleted ? Icons.check_rounded : Icons.quiz_rounded,
                 color: _isCompleted ? AppColors.success : AppColors.brand,
               ),
               const SizedBox(width: AppSpacing.md),
@@ -780,11 +774,13 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isCompleted ? 'Leçon terminée' : 'Fin de la leçon',
+                      _isCompleted ? 'Leçon validée ✓' : 'Valider la leçon',
                       style: context.text.titleMedium,
                     ),
                     Text(
-                      'Validez vos acquis avec les défis pratiques (QCM, diagnostic de code & étapes).',
+                      _isCompleted
+                          ? 'Vous avez validé cette leçon. Vous pouvez refaire la série de QCM pour consolider vos acquis.'
+                          : 'Réussissez au moins 60 % de la série de QCM (QCM, diagnostic de code & étapes) pour valider cette leçon.',
                       style: context.text.bodySmall,
                     ),
                   ],
@@ -793,22 +789,24 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          if (!_isCompleted) ...[
+          if (!_isCompleted)
             PrimaryButton(
-              label: 'Marquer terminée',
-              icon: Icons.check_rounded,
-              isLoading: _isSaving,
-              onPressed: () => _saveProgress(markAsCompleted: true),
+              label: 'Passer la série de QCM pour valider',
+              icon: Icons.quiz_rounded,
+              onPressed: () async {
+                await context.push('/lessons/${widget.lessonId}/exercises');
+                await _loadLessonCacheFirst();
+              },
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: () async {
+                await context.push('/lessons/${widget.lessonId}/exercises');
+                await _loadLessonCacheFirst();
+              },
+              icon: const Icon(Icons.replay_rounded),
+              label: const Text('Refaire la série de QCM'),
             ),
-            const SizedBox(height: AppSpacing.sm + 2),
-          ],
-          OutlinedButton.icon(
-            onPressed: () => context.push(
-              '/lessons/${widget.lessonId}/exercises',
-            ),
-            icon: const Icon(Icons.quiz_rounded),
-            label: const Text('Passer aux Défis (QCM)'),
-          ),
         ],
       ),
     );
