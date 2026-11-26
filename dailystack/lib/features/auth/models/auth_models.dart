@@ -10,6 +10,7 @@ class UserPreferences {
   final bool notifyDailyLesson;
   final bool notifyReviews;
   final bool notifyImportantNews;
+  final int streakShields;
 
   UserPreferences({
     required this.theme,
@@ -19,6 +20,7 @@ class UserPreferences {
     required this.notifyDailyLesson,
     required this.notifyReviews,
     required this.notifyImportantNews,
+    this.streakShields = 1,
   });
 
   factory UserPreferences.fromJson(Map<String, dynamic> json) {
@@ -36,6 +38,7 @@ class UserPreferences {
       notifyDailyLesson: json['notifyDailyLesson'] as bool? ?? true,
       notifyReviews: json['notifyReviews'] as bool? ?? true,
       notifyImportantNews: json['notifyImportantNews'] as bool? ?? true,
+      streakShields: json['streakShields'] as int? ?? 1,
     );
   }
 
@@ -47,6 +50,7 @@ class UserPreferences {
         'notifyDailyLesson': notifyDailyLesson,
         'notifyReviews': notifyReviews,
         'notifyImportantNews': notifyImportantNews,
+        'streakShields': streakShields,
       };
 }
 
@@ -57,6 +61,7 @@ class UserProfile {
   final String role;
   final int currentLevel;
   final int streakDays;
+  final int streakShields;
   final String? lastActiveDate;
   final UserPreferences? preferences;
 
@@ -67,11 +72,15 @@ class UserProfile {
     required this.role,
     required this.currentLevel,
     required this.streakDays,
+    this.streakShields = 1,
     this.lastActiveDate,
     this.preferences,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final prefs = json['preferences'] != null
+        ? UserPreferences.fromJson(json['preferences'] as Map<String, dynamic>)
+        : null;
     return UserProfile(
       id: json['id'] as int,
       email: json['email'] as String,
@@ -79,12 +88,24 @@ class UserProfile {
       role: json['role'] as String,
       currentLevel: json['currentLevel'] as int? ?? 1,
       streakDays: json['streakDays'] as int? ?? 0,
+      streakShields:
+          json['streakShields'] as int? ?? prefs?.streakShields ?? 1,
       lastActiveDate: json['lastActiveDate'] as String?,
-      preferences: json['preferences'] != null
-          ? UserPreferences.fromJson(json['preferences'] as Map<String, dynamic>)
-          : null,
+      preferences: prefs,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'email': email,
+        'username': username,
+        'role': role,
+        'currentLevel': currentLevel,
+        'streakDays': streakDays,
+        'streakShields': streakShields,
+        if (lastActiveDate != null) 'lastActiveDate': lastActiveDate,
+        if (preferences != null) 'preferences': preferences!.toJson(),
+      };
 }
 
 class AuthResponse {
@@ -109,4 +130,3 @@ class AuthResponse {
     );
   }
 }
-

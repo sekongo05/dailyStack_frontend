@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import '../../features/learning/models/lesson_models.dart';
 import '../../features/watch/models/news_models.dart';
+import 'web_kv_store.dart';
 
 class PendingSyncItem {
   final int id;
@@ -15,20 +16,70 @@ class PendingSyncItem {
     required this.actionType,
     required this.payload,
   });
+
+  factory PendingSyncItem.fromJson(Map<String, dynamic> json) {
+    return PendingSyncItem(
+      id: json['id'] as int,
+      actionType: json['actionType'] as String,
+      payload: Map<String, dynamic>.from(
+        json['payload'] as Map? ?? const <String, dynamic>{},
+      ),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'actionType': actionType,
+        'payload': payload,
+      };
 }
 
 class LocalDatabase {
   static const _dbName = 'dailystack_offline.db';
   static const _dbVersion = 1;
 
-  Database? _db;
+  static const _webLessonsKey = 'dailystack_lessons_v1';
+  static const _webNewsKey = 'dailystack_news_v1';
+  static const _webPendingKey = 'dailystack_pending_v1';
+  static const _webMetaPrefix = 'dailystack_meta_';
 
-  // Fallback en mémoire pour Flutter Web (sqflite n'est pas supporté nativement sur navigateur).
-  final Map<int, String> _webLessons = {};
-  final Map<int, String> _webNews = {};
-  final List<PendingSyncItem> _webPendingQueue = [];
-  final Map<String, String> _webMetadata = {};
-  int _webNextPendingId = 1;
+  Database? _db;
+  final WebKvStore _webStore = WebKvStore();
+
+  Map<String, dynamic> _readWebMap(String storageKey) {
+    final raw = _webStore.read(storageKey);
+    if (raw == null || raw.isEmpty) return <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+    return <String, dynamic>{};
+  }
+
+  List<PendingSyncItem> _readWebPendingQueue() {
+    final raw = _webStore.read(_webPendingKey);
+    if (raw == null || raw.isEmpty) return <PendingSyncItem>[];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .map((e) => PendingSyncItem.fromJson(
+                  Map<String, dynamic>.from(e as Map),
+                ))
+            .toList();
+      }
+    } catch (_) {}
+    return <PendingSyncItem>[];
+  }
+
+  void _writeWebPendingQueue(List<PendingSyncItem> items) {
+    _webStore.write(
+      _webPendingKey,
+      jsonEncode(items.map((e) => e.toJson()).toList()),
+    );
+  }
 
   Future<Database> get database async {
     if (_db != null) return _db!;
@@ -72,10 +123,13 @@ class LocalDatabase {
   }
 
   Future<void> cacheLessons(List<LessonDetail> lessons) async {
+    if (lessons.isEmpty) return;
     if (kIsWeb) {
+      final map = _readWebMap(_webLessonsKey);
       for (final lesson in lessons) {
-        _webLessons[lesson.id] = jsonEncode(lesson.toJson());
+        map[lesson.id.toString()] = lesson.toJson();
       }
+      _webStore.write(_webLessonsKey, jsonEncode(map));
       return;
     }
     final db = await database;
@@ -97,9 +151,20 @@ class LocalDatabase {
 
   Future<LessonDetail?> getCachedLesson(int lessonId) async {
     if (kIsWeb) {
-      final rawJson = _webLessons[lessonId];
-      if (rawJson == null) return null;
-      return LessonDetail.fromJson(jsonDecode(rawJson) as Map<String, dynamic>);
+      final map = _readWebMap(_webLessonsKey);
+      final raw = map[lessonId.toString()];
+      if (raw == null) return null;
+      try {
+        if (raw is Map) {
+          return LessonDetail.fromJson(Map<String, dynamic>.from(raw));
+        }
+        if (raw is String) {
+          return LessonDetail.fromJson(
+            jsonDecode(raw) as Map<String, dynamic>,
+          );
+        }
+      } catch (_) {}
+      return null;
     }
     final db = await database;
     final rows = await db.query(
@@ -114,10 +179,13 @@ class LocalDatabase {
   }
 
   Future<void> cacheNews(List<TechNewsSummary> news) async {
+    if (news.isEmpty) return;
     if (kIsWeb) {
+      final map = _readWebMap(_webNewsKey);
       for (final item in news) {
-        _webNews[item.id] = jsonEncode(item.toJson());
+        map[item.id.toString()] = item.toJson();
       }
+      _webStore.write(_webNewsKey, jsonEncode(map));
       return;
     }
     final db = await database;
@@ -139,12 +207,25 @@ class LocalDatabase {
 
   Future<List<TechNewsSummary>> getCachedNews() async {
     if (kIsWeb) {
-      final keys = _webNews.keys.toList()..sort((a, b) => b.compareTo(a));
-      return keys
-          .map((k) => TechNewsSummary.fromJson(
-                jsonDecode(_webNews[k]!) as Map<String, dynamic>,
-              ))
-          .toList();
+      final map = _readWebMap(_webNewsKey);
+      final entries = <TechNewsSummary>[];
+      for (final val in map.values) {
+        try {
+          if (val is Map) {
+            entries.add(
+              TechNewsSummary.fromJson(Map<String, dynamic>.from(val)),
+            );
+          } else if (val is String) {
+            entries.add(
+              TechNewsSummary.fromJson(
+                jsonDecode(val) as Map<String, dynamic>,
+              ),
+            );
+          }
+        } catch (_) {}
+      }
+      entries.sort((a, b) => b.id.compareTo(a.id));
+      return entries;
     }
     final db = await database;
     final rows = await db.query('cached_news', orderBy: 'id DESC');
@@ -160,13 +241,18 @@ class LocalDatabase {
     Map<String, dynamic> payload,
   ) async {
     if (kIsWeb) {
-      _webPendingQueue.add(
+      final queue = _readWebPendingQueue();
+      final nextId = queue.isEmpty
+          ? 1
+          : (queue.map((e) => e.id).reduce((a, b) => a > b ? a : b) + 1);
+      queue.add(
         PendingSyncItem(
-          id: _webNextPendingId++,
+          id: nextId,
           actionType: actionType,
           payload: Map<String, dynamic>.from(payload),
         ),
       );
+      _writeWebPendingQueue(queue);
       return;
     }
     final db = await database;
@@ -179,7 +265,7 @@ class LocalDatabase {
 
   Future<List<PendingSyncItem>> getPendingActions() async {
     if (kIsWeb) {
-      return List<PendingSyncItem>.from(_webPendingQueue);
+      return _readWebPendingQueue();
     }
     final db = await database;
     final rows = await db.query('pending_sync_queue', orderBy: 'id ASC');
@@ -197,7 +283,9 @@ class LocalDatabase {
     if (ids.isEmpty) return;
     if (kIsWeb) {
       final idSet = ids.toSet();
-      _webPendingQueue.removeWhere((item) => idSet.contains(item.id));
+      final queue = _readWebPendingQueue()
+        ..removeWhere((item) => idSet.contains(item.id));
+      _writeWebPendingQueue(queue);
       return;
     }
     final db = await database;
@@ -210,7 +298,7 @@ class LocalDatabase {
   }
 
   Future<int> getPendingCount() async {
-    if (kIsWeb) return _webPendingQueue.length;
+    if (kIsWeb) return _readWebPendingQueue().length;
     final db = await database;
     final res = await db.rawQuery(
       'SELECT COUNT(*) as cnt FROM pending_sync_queue',
@@ -228,7 +316,7 @@ class LocalDatabase {
 
   Future<void> setMetadata(String key, String value) async {
     if (kIsWeb) {
-      _webMetadata[key] = value;
+      _webStore.write('$_webMetaPrefix$key', value);
       return;
     }
     final db = await database;
@@ -240,7 +328,7 @@ class LocalDatabase {
   }
 
   Future<String?> getMetadata(String key) async {
-    if (kIsWeb) return _webMetadata[key];
+    if (kIsWeb) return _webStore.read('$_webMetaPrefix$key');
     final db = await database;
     final rows = await db.query(
       'sync_metadata',
@@ -254,10 +342,7 @@ class LocalDatabase {
 
   Future<void> clearAll() async {
     if (kIsWeb) {
-      _webLessons.clear();
-      _webNews.clear();
-      _webPendingQueue.clear();
-      _webMetadata.clear();
+      _webStore.clearAll();
       return;
     }
     final db = await database;

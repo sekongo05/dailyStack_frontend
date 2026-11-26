@@ -59,6 +59,9 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
             lastVerifiedDate: cachedSummary.lastVerifiedDate,
             aiGenerated: cachedSummary.aiGenerated,
             bookmarked: cachedSummary.bookmarked,
+            relatedLessonId: cachedSummary.relatedLessonId,
+            relatedCurriculumCode: cachedSummary.relatedCurriculumCode,
+            relatedLessonTitle: cachedSummary.relatedLessonTitle,
             originalSourceUrl: '',
           );
           _isLoading = false;
@@ -79,23 +82,7 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
           await ref.read(newsServiceProvider).toggleBookmark(_detail!.id);
       if (!mounted) return;
       setState(() {
-        final d = _detail!;
-        _detail = TechNewsDetail(
-          id: d.id,
-          title: d.title,
-          category: d.category,
-          targetTechnology: d.targetTechnology,
-          summary: d.summary,
-          importance: d.importance,
-          publishedDate: d.publishedDate,
-          lastVerifiedDate: d.lastVerifiedDate,
-          aiGenerated: d.aiGenerated,
-          bookmarked: bookmarked,
-          fullContent: d.fullContent,
-          changesSummary: d.changesSummary,
-          developerImpact: d.developerImpact,
-          originalSourceUrl: d.originalSourceUrl,
-        );
+        _detail = _detail!.copyWith(bookmarked: bookmarked);
       });
     } catch (e) {
       if (!mounted) return;
@@ -108,6 +95,11 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
+    final hasRelatedLesson = detail != null &&
+        (detail.relatedLessonId != null ||
+            (detail.relatedCurriculumCode != null &&
+                detail.relatedCurriculumCode!.trim().isNotEmpty));
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Veille'),
@@ -182,6 +174,15 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
                                 'Publié le ${detail.publishedDate}${detail.lastVerifiedDate.isNotEmpty ? ' · Vérifié le ${detail.lastVerifiedDate}' : ''}',
                                 style: context.text.bodySmall,
                               ),
+                              if (hasRelatedLesson) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                RelatedLessonBanner(
+                                  relatedLessonId: detail.relatedLessonId,
+                                  relatedCurriculumCode:
+                                      detail.relatedCurriculumCode,
+                                  relatedLessonTitle: detail.relatedLessonTitle,
+                                ),
+                              ],
                               const SizedBox(height: AppSpacing.lg),
                               SurfaceCard(
                                 child: Text(

@@ -3,102 +3,299 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/storage/local_database.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/domain_badge.dart';
+import '../../../core/widgets/pwa_install_sheet.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
 import '../../learning/models/lesson_models.dart';
+import '../../learning/services/lesson_service.dart';
 import '../../notifications/screens/notifications_screen.dart';
 import '../../practice/models/practice_models.dart';
 import '../../watch/models/news_models.dart';
 
-final todayLessonProvider = FutureProvider.autoDispose<DailyLessonSummary>((ref) async {
-  final localDb = ref.watch(localDatabaseProvider);
-  try {
-    final lesson = await ref.watch(lessonServiceProvider).getTodayLesson();
-    await localDb.setMetadata('todayLesson', jsonEncode(lesson.toJson()));
-    return lesson;
-  } catch (_) {
-    final cached = await localDb.getMetadata('todayLesson');
-    if (cached != null) {
-      return DailyLessonSummary.fromJson(jsonDecode(cached) as Map<String, dynamic>);
+class HomeBootstrapState {
+  final HomeBootstrap? bootstrap;
+  final DailyLessonSummary? fallbackLesson;
+  final bool isInitialLoading;
+  final bool isRefreshing;
+  final String? error;
+
+  const HomeBootstrapState({
+    this.bootstrap,
+    this.fallbackLesson,
+    this.isInitialLoading = true,
+    this.isRefreshing = false,
+    this.error,
+  });
+
+  DailyLessonSummary? get activeLesson =>
+      bootstrap?.todayLesson ?? fallbackLesson;
+
+  HomeBootstrapState copyWith({
+    HomeBootstrap? bootstrap,
+    DailyLessonSummary? fallbackLesson,
+    bool? isInitialLoading,
+    bool? isRefreshing,
+    String? error,
+    bool clearError = false,
+  }) {
+    return HomeBootstrapState(
+      bootstrap: bootstrap ?? this.bootstrap,
+      fallbackLesson: fallbackLesson ?? this.fallbackLesson,
+      isInitialLoading: isInitialLoading ?? this.isInitialLoading,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
+
+class HomeBootstrapNotifier extends StateNotifier<HomeBootstrapState> {
+  static const _bootstrapCacheKey = 'homeBootstrap_v1';
+  static const _legacyTodayKey = 'todayLesson';
+  static const _progressCacheKey = 'progressSummary_v1';
+
+  final LessonService _lessonService;
+  final LocalDatabase _localDb;
+
+  HomeBootstrapNotifier({
+    required this._lessonService,
+    required this._localDb,
+  }) : super(const HomeBootstrapState()) {
+    _loadStaleWhileRevalidate();
+  }
+
+  Future<void> _loadStaleWhileRevalidate() async {
+    try {
+      final rawBootstrap = await _localDb.getMetadata(_bootstrapCacheKey);
+      if (rawBootstrap != null && rawBootstrap.isNotEmpty) {
+        final cachedBootstrap = HomeBootstrap.fromJson(
+          jsonDecode(rawBootstrap) as Map<String, dynamic>,
+        );
+        if (mounted) {
+          state = state.copyWith(
+            bootstrap: cachedBootstrap,
+            fallbackLesson: cachedBootstrap.todayLesson,
+            isInitialLoading: false,
+            isRefreshing: true,
+            clearError: true,
+          );
+        }
+      } else {
+        final rawToday = await _localDb.getMetadata(_legacyTodayKey);
+        if (rawToday != null && rawToday.isNotEmpty) {
+          final cachedLesson = DailyLessonSummary.fromJson(
+            jsonDecode(rawToday) as Map<String, dynamic>,
+          );
+          if (mounted) {
+            state = state.copyWith(
+              fallbackLesson: cachedLesson,
+              isInitialLoading: false,
+              isRefreshing: true,
+              clearError: true,
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // Cache absent ou obsolète : on poursuit sur le réseau.
     }
-    rethrow;
-  }
-});
 
-final dueReviewsProvider = FutureProvider.autoDispose<List<ConceptMasterySummary>>((ref) async {
-  try {
-    return await ref.watch(practiceServiceProvider).getDueReviews();
-  } catch (_) {
-    return [];
+    await refresh();
   }
-});
 
-final homeProgressProvider = FutureProvider.autoDispose<ProgressSummary?>((ref) async {
-  try {
-    return await ref.watch(practiceServiceProvider).getProgressSummary();
-  } catch (_) {
-    return null;
-  }
-});
+  Future<void> refresh() async {
+    final hasCachedContent = state.activeLesson != null;
+    if (mounted) {
+      state = state.copyWith(
+        isInitialLoading: !hasCachedContent,
+        isRefreshing: hasCachedContent,
+        clearError: true,
+      );
+    }
 
-final homeNewsProvider = FutureProvider.autoDispose<List<TechNewsSummary>>((ref) async {
-  try {
-    return await ref.watch(newsServiceProvider).getNews(size: 3);
-  } catch (_) {
-    return [];
+    try {
+      final fresh = await _lessonService.getHomeBootstrap();
+      await _persistBootstrap(fresh);
+      if (!mounted) return;
+      state = state.copyWith(
+        bootstrap: fresh,
+        fallbackLesson: fresh.todayLesson,
+        isInitialLoading: false,
+        isRefreshing: false,
+        clearError: true,
+      );
+    } catch (_) {
+      if (state.activeLesson != null) {
+        if (mounted) {
+          state = state.copyWith(
+            isInitialLoading: false,
+            isRefreshing: false,
+          );
+        }
+        return;
+      }
+
+      // Repli vers l'endpoint unitaire si /home/bootstrap est momentanément indisponible.
+      try {
+        final today = await _lessonService.getTodayLesson();
+        await _localDb.setMetadata(
+          _legacyTodayKey,
+          jsonEncode(today.toJson()),
+        );
+        if (!mounted) return;
+        state = state.copyWith(
+          fallbackLesson: today,
+          isInitialLoading: false,
+          isRefreshing: false,
+          clearError: true,
+        );
+      } catch (fallbackErr) {
+        if (!mounted) return;
+        state = state.copyWith(
+          isInitialLoading: false,
+          isRefreshing: false,
+          error: fallbackErr.toString(),
+        );
+      }
+    }
   }
+
+  Future<void> _persistBootstrap(HomeBootstrap bootstrap) async {
+    try {
+      await _localDb.setMetadata(
+        _bootstrapCacheKey,
+        jsonEncode(bootstrap.toJson()),
+      );
+      await _localDb.setMetadata(
+        _legacyTodayKey,
+        jsonEncode(bootstrap.todayLesson.toJson()),
+      );
+      if (bootstrap.progressSummary != null) {
+        await _localDb.setMetadata(
+          _progressCacheKey,
+          jsonEncode(bootstrap.progressSummary!.toJson()),
+        );
+      }
+      final lessonsToPrefetch = <LessonDetail>[
+        if (bootstrap.todayLessonDetail != null) bootstrap.todayLessonDetail!,
+        if (bootstrap.tomorrowLessonDetail != null)
+          bootstrap.tomorrowLessonDetail!,
+      ];
+      if (lessonsToPrefetch.isNotEmpty) {
+        await _localDb.cacheLessons(lessonsToPrefetch);
+      }
+      if (bootstrap.recentNews.isNotEmpty) {
+        final existingNews = await _localDb.getCachedNews();
+        if (existingNews.isEmpty) {
+          await _localDb.cacheNews(bootstrap.recentNews);
+        }
+      }
+    } catch (_) {}
+  }
+}
+
+final homeBootstrapProvider =
+    StateNotifierProvider<HomeBootstrapNotifier, HomeBootstrapState>(
+  (ref) => HomeBootstrapNotifier(
+    lessonService: ref.watch(lessonServiceProvider),
+    localDb: ref.watch(localDatabaseProvider),
+  ),
+);
+
+/// Conservé pour compatibilité avec les écrans invalidant `todayLessonProvider`.
+final todayLessonProvider =
+    FutureProvider.autoDispose<DailyLessonSummary>((ref) async {
+  final state = ref.watch(homeBootstrapProvider);
+  if (state.activeLesson != null) return state.activeLesson!;
+  return ref.watch(lessonServiceProvider).getTodayLesson();
 });
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  void _refreshAll(WidgetRef ref) {
-    ref.invalidate(todayLessonProvider);
-    ref.invalidate(dueReviewsProvider);
-    ref.invalidate(homeProgressProvider);
-    ref.invalidate(homeNewsProvider);
+  Future<void> _refreshAll(WidgetRef ref) async {
+    await ref.read(homeBootstrapProvider.notifier).refresh();
     ref.invalidate(notificationsListProvider);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final todayAsync = ref.watch(todayLessonProvider);
+    final homeState = ref.watch(homeBootstrapProvider);
+    final lesson = homeState.activeLesson;
+
+    if (homeState.isInitialLoading && lesson == null) {
+      return const Scaffold(body: HomeSkeletonView());
+    }
+
+    if (lesson == null) {
+      return Scaffold(
+        body: AppErrorView(
+          message: homeState.error ?? 'Impossible de charger votre accueil.',
+          onRetry: () => _refreshAll(ref),
+        ),
+      );
+    }
+
+    final bootstrap = homeState.bootstrap;
+    final tomorrowPreview = bootstrap?.tomorrowLessonPreview;
+    final isTomorrowCached = bootstrap?.tomorrowLessonDetail != null;
 
     return Scaffold(
-      body: todayAsync.when(
-        loading: () => const HomeSkeletonView(),
-        error: (err, _) => AppErrorView(message: err.toString(), onRetry: () => _refreshAll(ref)),
-        data: (lesson) => RefreshIndicator(
-          onRefresh: () async => _refreshAll(ref),
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-            children: [
-              const _Greeting(),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: AppSpacing.sm),
-                    _TodayLessonHero(
-                      lesson: lesson,
-                      onOpen: () async {
-                        await context.push('/lessons/${lesson.id}');
-                        _refreshAll(ref);
+      body: RefreshIndicator(
+        onRefresh: () => _refreshAll(ref),
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+          children: [
+            _Greeting(
+              bootstrap: bootstrap,
+              isRefreshing: homeState.isRefreshing,
+              onNotificationsTap: () async {
+                await context.push('/notifications');
+                await _refreshAll(ref);
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: AppSpacing.sm),
+                  const PwaInstallBanner(),
+                  _TodayLessonHero(
+                    lesson: lesson,
+                    onOpen: () async {
+                      await context.push('/lessons/${lesson.id}');
+                      await _refreshAll(ref);
+                    },
+                  ),
+                  if (tomorrowPreview != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _TomorrowPreviewCard(
+                      lesson: tomorrowPreview,
+                      isOfflineReady: isTomorrowCached,
+                      onTap: () async {
+                        await context.push('/lessons/${tomorrowPreview.id}');
+                        await _refreshAll(ref);
                       },
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    const _StatsRow(),
-                    const _ReviewsCard(),
-                    const SizedBox(height: AppSpacing.lg),
-                    const _NewsPreview(),
                   ],
-                ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _StatsRow(summary: bootstrap?.progressSummary),
+                  _ReviewsCard(
+                    reviews: bootstrap?.dueReviews ?? const [],
+                    onTap: () async {
+                      await context.push('/reviews');
+                      await _refreshAll(ref);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _NewsPreview(news: bootstrap?.recentNews ?? const []),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -106,12 +303,38 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _Greeting extends ConsumerWidget {
-  const _Greeting();
+  final HomeBootstrap? bootstrap;
+  final bool isRefreshing;
+  final VoidCallback onNotificationsTap;
 
-  static const _days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+  const _Greeting({
+    required this.bootstrap,
+    required this.isRefreshing,
+    required this.onNotificationsTap,
+  });
+
+  static const _days = [
+    'lundi',
+    'mardi',
+    'mercredi',
+    'jeudi',
+    'vendredi',
+    'samedi',
+    'dimanche',
+  ];
   static const _months = [
-    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
   ];
 
   String _todayLabel() {
@@ -120,42 +343,214 @@ class _Greeting extends ConsumerWidget {
     return '${day[0].toUpperCase()}${day.substring(1)} ${now.day} ${_months[now.month - 1]}';
   }
 
+  void _showStreakShieldSheet(
+    BuildContext context, {
+    required int shields,
+    required bool usedRecently,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const IconTile(
+                    icon: Icons.shield_rounded,
+                    color: AppColors.brand,
+                    size: 46,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Bouclier de série',
+                          style: ctx.text.titleLarge,
+                        ),
+                        Text(
+                          '$shields / 3 bouclier(s) disponible(s)',
+                          style: ctx.text.bodySmall?.copyWith(
+                            color: AppColors.brand,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Bouclier de série : protège automatiquement votre série si vous manquez 1 journée. +1 bouclier toutes les 7 leçons terminées (max 3).',
+                style: ctx.text.bodyMedium,
+              ),
+              if (usedRecently) ...[
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.verified_user_rounded,
+                        size: 18,
+                        color: AppColors.success,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Un bouclier a récemment protégé votre série active !',
+                          style: ctx.text.labelMedium?.copyWith(
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              PrimaryButton(
+                label: 'Parfait',
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final unread = ref.watch(notificationsListProvider).valueOrNull?.where((n) => !n.read).length ?? 0;
+    final unreadFromList = ref
+        .watch(notificationsListProvider)
+        .valueOrNull
+        ?.where((n) => !n.read)
+        .length;
+    final unread = unreadFromList ?? bootstrap?.unreadNotificationsCount ?? 0;
+    final streakDays =
+        bootstrap?.progressSummary?.streakDays ?? user?.streakDays ?? 0;
+    final shields = bootstrap?.streakShields ??
+        bootstrap?.progressSummary?.streakShields ??
+        user?.streakShields ??
+        1;
+    final shieldUsedRecently =
+        bootstrap?.progressSummary?.shieldUsedRecently ?? false;
     final name = user?.username;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm + 4, AppSpacing.xs, 0),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm + 4,
+        AppSpacing.xs,
+        0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_todayLabel(), style: context.text.bodySmall),
-                const SizedBox(height: 2),
-                Text(
-                  name != null ? 'Bonjour, $name' : 'Bonjour',
-                  style: context.text.headlineMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _todayLabel(),
+                            style: context.text.bodySmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isRefreshing) ...[
+                          const SizedBox(width: AppSpacing.sm),
+                          const _SyncingPill(),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      name != null ? 'Bonjour, $name' : 'Bonjour',
+                      style: context.text.headlineMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-              ],
+              ),
+              _StreakChip(days: streakDays),
+              const SizedBox(width: 6),
+              _StreakShieldChip(
+                shields: shields,
+                onTap: () => _showStreakShieldSheet(
+                  context,
+                  shields: shields,
+                  usedRecently: shieldUsedRecently,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Notifications',
+                onPressed: onNotificationsTap,
+                icon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text('$unread'),
+                  child: const Icon(Icons.notifications_none_rounded, size: 26),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SyncingPill extends StatelessWidget {
+  const _SyncingPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.brand.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: AppColors.brand,
             ),
           ),
-          if (user != null) _StreakChip(days: user.streakDays),
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: () async {
-              await context.push('/notifications');
-              ref.invalidate(notificationsListProvider);
-            },
-            icon: Badge(
-              isLabelVisible: unread > 0,
-              label: Text('$unread'),
-              child: const Icon(Icons.notifications_none_rounded, size: 26),
+          const SizedBox(width: 5),
+          Text(
+            'Synchronisation…',
+            style: context.text.labelSmall?.copyWith(
+              fontSize: 10.5,
+              color: AppColors.brand,
             ),
           ),
         ],
@@ -181,13 +576,62 @@ class _StreakChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.local_fire_department_rounded, color: AppColors.streak, size: 18),
+            const Icon(
+              Icons.local_fire_department_rounded,
+              color: AppColors.streak,
+              size: 18,
+            ),
             const SizedBox(width: 4),
             Text(
               '$days',
               style: context.text.labelLarge?.copyWith(color: AppColors.streak),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakShieldChip extends StatelessWidget {
+  final int shields;
+  final VoidCallback onTap;
+
+  const _StreakShieldChip({
+    required this.shields,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Bouclier de série : $shields disponible(s)',
+      child: Material(
+        color: AppColors.brand.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.shield_rounded,
+                  color: AppColors.brand,
+                  size: 17,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$shields',
+                  style:
+                      context.text.labelLarge?.copyWith(color: AppColors.brand),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -209,8 +653,8 @@ class _TodayLessonHero extends StatelessWidget {
     final gradientColors = isBackend
         ? const [Color(0xFF0F172A), Color(0xFF0A2E26)]
         : const [Color(0xFF0F172A), Color(0xFF0A273D)];
-    final shadowColor = accentColor;
-    final progressPercent = (lesson.scrollOffsetRatio.clamp(0.0, 1.0) * 100).round();
+    final progressPercent =
+        (lesson.scrollOffsetRatio.clamp(0.0, 1.0) * 100).round();
 
     final (ctaLabel, ctaIcon) = isInProgress
         ? ('Continuer ($progressPercent%)', Icons.play_arrow_rounded)
@@ -224,9 +668,10 @@ class _TodayLessonHero extends StatelessWidget {
             : lesson.revisionDay
                 ? 'Révision du jour'
                 : 'Leçon du jour';
-    final codePrefix = (lesson.curriculumCode != null && lesson.curriculumCode!.isNotEmpty)
-        ? '${lesson.curriculumCode} · '
-        : '';
+    final codePrefix =
+        (lesson.curriculumCode != null && lesson.curriculumCode!.isNotEmpty)
+            ? '${lesson.curriculumCode} · '
+            : '';
     final subtitleMeta =
         '$codePrefix${DailyLessonSummary.levelLabel(lesson.level)} · ${isBackend ? 'Backend' : 'DevOps'}';
 
@@ -244,14 +689,16 @@ class _TodayLessonHero extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: shadowColor.withValues(alpha: 0.18),
+            color: accentColor.withValues(alpha: 0.18),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
       ),
       padding: EdgeInsets.all(
-        MediaQuery.sizeOf(context).width < 400 ? AppSpacing.md : AppSpacing.lg - 4,
+        MediaQuery.sizeOf(context).width < 400
+            ? AppSpacing.md
+            : AppSpacing.lg - 4,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,17 +706,24 @@ class _TodayLessonHero extends StatelessWidget {
           Row(
             children: [
               _HeroPill(
-                icon: isCompleted ? Icons.check_circle_rounded : DomainBadge.iconFor(lesson.domainCode),
+                icon: isCompleted
+                    ? Icons.check_circle_rounded
+                    : DomainBadge.iconFor(lesson.domainCode),
                 label: statusLabel,
               ),
               const Spacer(),
-              _HeroPill(icon: Icons.schedule_rounded, label: '${lesson.estimatedMinutes} min'),
+              _HeroPill(
+                icon: Icons.schedule_rounded,
+                label: '${lesson.estimatedMinutes} min',
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
             subtitleMeta,
-            style: context.text.labelMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
+            style: context.text.labelMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
@@ -307,6 +761,87 @@ class _TodayLessonHero extends StatelessWidget {
   }
 }
 
+class _TomorrowPreviewCard extends StatelessWidget {
+  final DailyLessonSummary lesson;
+  final bool isOfflineReady;
+  final VoidCallback onTap;
+
+  const _TomorrowPreviewCard({
+    required this.lesson,
+    required this.isOfflineReady,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final domainColor = DomainBadge.colorFor(lesson.domainCode);
+    final codePrefix =
+        (lesson.curriculumCode != null && lesson.curriculumCode!.isNotEmpty)
+            ? '${lesson.curriculumCode} · '
+            : '';
+
+    return SurfaceCard(
+      onTap: onTap,
+      borderColor: domainColor.withValues(alpha: 0.30),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'APERÇU DE DEMAIN (J+1)',
+                style: context.text.labelSmall?.copyWith(
+                  color: context.palette.textMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              DomainBadge(domainCode: lesson.domainCode),
+              if (isOfflineReady)
+                const TagPill(
+                  label: 'Pré-chargé hors-ligne ✓',
+                  color: AppColors.success,
+                  icon: Icons.offline_pin_rounded,
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm + 2),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$codePrefix${lesson.title}',
+                      style: context.text.titleSmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${DailyLessonSummary.levelLabel(lesson.level)} · ${lesson.estimatedMinutes} min',
+                      style: context.text.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: context.palette.textMuted,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HeroPill extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -325,19 +860,22 @@ class _HeroPill extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: Colors.white),
           const SizedBox(width: 5),
-          Text(label, style: context.text.labelSmall?.copyWith(color: Colors.white)),
+          Text(
+            label,
+            style: context.text.labelSmall?.copyWith(color: Colors.white),
+          ),
         ],
       ),
     );
   }
 }
 
-class _StatsRow extends ConsumerWidget {
-  const _StatsRow();
+class _StatsRow extends StatelessWidget {
+  final ProgressSummary? summary;
+  const _StatsRow({required this.summary});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(homeProgressProvider).valueOrNull;
+  Widget build(BuildContext context) {
     if (summary == null) return const SizedBox.shrink();
 
     return Row(
@@ -346,7 +884,7 @@ class _StatsRow extends ConsumerWidget {
           child: StatTile(
             icon: Icons.local_fire_department_rounded,
             color: AppColors.streak,
-            value: '${summary.streakDays}',
+            value: '${summary!.streakDays}',
             label: 'Jours de suite',
           ),
         ),
@@ -355,7 +893,7 @@ class _StatsRow extends ConsumerWidget {
           child: StatTile(
             icon: Icons.menu_book_rounded,
             color: AppColors.brand,
-            value: '${summary.totalLessonsCompleted}',
+            value: '${summary!.totalLessonsCompleted}',
             label: 'Leçons',
           ),
         ),
@@ -364,7 +902,7 @@ class _StatsRow extends ConsumerWidget {
           child: StatTile(
             icon: Icons.verified_rounded,
             color: AppColors.success,
-            value: '${summary.totalNotionsMastered}',
+            value: '${summary!.totalNotionsMastered}',
             label: 'Maîtrisées',
           ),
         ),
@@ -373,24 +911,26 @@ class _StatsRow extends ConsumerWidget {
   }
 }
 
-class _ReviewsCard extends ConsumerWidget {
-  const _ReviewsCard();
+class _ReviewsCard extends StatelessWidget {
+  final List<ConceptMasterySummary> reviews;
+  final VoidCallback onTap;
+
+  const _ReviewsCard({required this.reviews, required this.onTap});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reviews = ref.watch(dueReviewsProvider).valueOrNull ?? [];
+  Widget build(BuildContext context) {
     if (reviews.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.md),
       child: SurfaceCard(
-        onTap: () async {
-          await context.push('/reviews');
-          ref.invalidate(dueReviewsProvider);
-        },
+        onTap: onTap,
         child: Row(
           children: [
-            const IconTile(icon: Icons.auto_awesome_rounded, color: AppColors.warning),
+            const IconTile(
+              icon: Icons.auto_awesome_rounded,
+              color: AppColors.warning,
+            ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
@@ -405,7 +945,10 @@ class _ReviewsCard extends ConsumerWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: context.palette.textMuted),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: context.palette.textMuted,
+            ),
           ],
         ),
       ),
@@ -413,12 +956,12 @@ class _ReviewsCard extends ConsumerWidget {
   }
 }
 
-class _NewsPreview extends ConsumerWidget {
-  const _NewsPreview();
+class _NewsPreview extends StatelessWidget {
+  final List<TechNewsSummary> news;
+  const _NewsPreview({required this.news});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final news = ref.watch(homeNewsProvider).valueOrNull ?? [];
+  Widget build(BuildContext context) {
     if (news.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -434,7 +977,11 @@ class _NewsPreview extends ConsumerWidget {
           child: Column(
             children: [
               for (var i = 0; i < news.length; i++) ...[
-                if (i > 0) const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+                if (i > 0)
+                  const Divider(
+                    indent: AppSpacing.md,
+                    endIndent: AppSpacing.md,
+                  ),
                 _NewsRow(item: news[i]),
               ],
             ],
@@ -461,9 +1008,26 @@ class _NewsRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.targetTechnology.toUpperCase(),
-                    style: context.text.labelSmall?.copyWith(color: AppColors.brand),
+                  Wrap(
+                    spacing: AppSpacing.xs + 2,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        item.targetTechnology.toUpperCase(),
+                        style: context.text.labelSmall?.copyWith(
+                          color: AppColors.brand,
+                        ),
+                      ),
+                      if (item.relatedCurriculumCode != null &&
+                          item.relatedCurriculumCode!.isNotEmpty)
+                        Text(
+                          '· Cours ${item.relatedCurriculumCode}',
+                          style: context.text.labelSmall?.copyWith(
+                            color: AppColors.backend,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -476,7 +1040,10 @@ class _NewsRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            Icon(Icons.chevron_right_rounded, color: context.palette.textMuted),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: context.palette.textMuted,
+            ),
           ],
         ),
       ),

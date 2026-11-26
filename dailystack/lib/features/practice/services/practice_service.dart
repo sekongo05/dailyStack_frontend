@@ -26,14 +26,18 @@ class PracticeService {
   Future<EvaluationResult> submitAnswer({
     required int exerciseId,
     int? selectedOptionId,
+    List<int>? orderedOptionIds,
     String? submittedText,
+    int? confidenceLevel,
   }) async {
     try {
       final response = await _client.dio.post(
         '/exercises/$exerciseId/submit',
         data: {
           'selectedOptionId': ?selectedOptionId,
+          'orderedOptionIds': ?orderedOptionIds,
           'submittedText': ?submittedText,
+          'confidenceLevel': ?confidenceLevel,
         },
       );
       final apiRes = ApiResponse.fromJson(
@@ -74,4 +78,3 @@ class PracticeService {
     }
   }
 }
-

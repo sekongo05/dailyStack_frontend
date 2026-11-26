@@ -36,11 +36,31 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   }
 
   Future<void> _loadNews() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
     final localDb = ref.read(localDatabaseProvider);
+    final isDefaultFeed = !_onlyBookmarks &&
+        _selectedCategory == null &&
+        _searchController.text.trim().isEmpty;
+
+    if (isDefaultFeed && _items.isEmpty) {
+      try {
+        final cached = await localDb.getCachedNews();
+        if (cached.isNotEmpty && mounted) {
+          setState(() {
+            _items = cached;
+            _isLoading = false;
+            _error = null;
+          });
+        }
+      } catch (_) {}
+    }
+
+    if (_items.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     try {
       final newsService = ref.read(newsServiceProvider);
       final list = _onlyBookmarks
@@ -50,15 +70,14 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               keyword: _searchController.text.trim(),
               size: 30,
             );
-      if (!_onlyBookmarks &&
-          _selectedCategory == null &&
-          _searchController.text.trim().isEmpty) {
+      if (isDefaultFeed) {
         await localDb.cacheNews(list);
       }
       if (!mounted) return;
       setState(() {
         _items = list;
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
       final cached = await localDb.getCachedNews();
@@ -84,6 +103,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         setState(() {
           _items = filtered;
           _isLoading = false;
+          _error = null;
         });
         return;
       }
@@ -113,18 +133,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       setState(() => _items.removeAt(index));
     } else {
       setState(() {
-        _items[index] = TechNewsSummary(
-          id: item.id,
-          title: item.title,
-          category: item.category,
-          targetTechnology: item.targetTechnology,
-          summary: item.summary,
-          importance: item.importance,
-          publishedDate: item.publishedDate,
-          lastVerifiedDate: item.lastVerifiedDate,
-          aiGenerated: item.aiGenerated,
-          bookmarked: bookmarked,
-        );
+        _items[index] = item.copyWith(bookmarked: bookmarked);
       });
     }
   }
@@ -305,6 +314,10 @@ class _NewsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasRelatedLesson = item.relatedLessonId != null ||
+        (item.relatedCurriculumCode != null &&
+            item.relatedCurriculumCode!.trim().isNotEmpty);
+
     return SurfaceCard(
       onTap: onTap,
       child: Column(
@@ -358,6 +371,15 @@ class _NewsCard extends StatelessWidget {
               color: context.palette.textMuted,
             ),
           ),
+          if (hasRelatedLesson) ...[
+            const SizedBox(height: AppSpacing.sm + 4),
+            RelatedLessonBanner(
+              relatedLessonId: item.relatedLessonId,
+              relatedCurriculumCode: item.relatedCurriculumCode,
+              relatedLessonTitle: item.relatedLessonTitle,
+              compact: true,
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
@@ -376,7 +398,7 @@ class _NewsCard extends StatelessWidget {
               ),
               if (item.aiGenerated) ...[
                 const SizedBox(width: AppSpacing.sm),
-                Icon(
+                const Icon(
                   Icons.auto_awesome_rounded,
                   size: 14,
                   color: AppColors.brand,

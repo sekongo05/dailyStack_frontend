@@ -4,10 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/pwa_install_sheet.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
 import '../../home/screens/home_screen.dart';
+import '../../learning/screens/tracks_screen.dart';
+import '../../practice/screens/progress_screen.dart';
 import '../models/auth_models.dart';
+import '../widgets/level_placement_quiz_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -66,6 +70,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  Future<void> _openPlacementQuiz() async {
+    final recommended = await showLevelPlacementQuizSheet(context);
+    if (recommended != null && mounted) {
+      setState(() => _currentLevel = recommended);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Niveau $recommended sélectionné. Appuyez sur « Enregistrer » pour confirmer.',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _savePreferences() async {
     setState(() => _isSaving = true);
     try {
@@ -82,6 +100,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (!mounted) return;
       ref.read(currentUserProvider.notifier).state = refreshedProfile;
       ref.invalidate(todayLessonProvider);
+      ref.read(homeBootstrapProvider.notifier).refresh();
+      ref.read(tracksNotifierProvider.notifier).loadTracks();
+      ref.read(progressSummaryProvider.notifier).refresh();
       setState(() => _profile = refreshedProfile);
       applyUserPreferences(ref, updated);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -160,13 +181,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                                   const SizedBox(height: AppSpacing.sm),
                                   DropdownButtonFormField<int>(
+                                    key: ValueKey<int>(_currentLevel),
                                     initialValue: _currentLevel,
+                                    isExpanded: true,
                                     items: const [
-                                      DropdownMenuItem(value: 1, child: Text('Niveau 1 — Amateur')),
-                                      DropdownMenuItem(value: 2, child: Text('Niveau 2 — Débutant')),
-                                      DropdownMenuItem(value: 3, child: Text('Niveau 3 — Junior')),
-                                      DropdownMenuItem(value: 4, child: Text('Niveau 4 — Senior')),
-                                      DropdownMenuItem(value: 5, child: Text('Niveau 5 — Expert')),
+                                      DropdownMenuItem(
+                                        value: 1,
+                                        child: Text('Niveau 1 — Amateur'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 2,
+                                        child: Text('Niveau 2 — Débutant'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 3,
+                                        child: Text('Niveau 3 — Junior'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 4,
+                                        child: Text('Niveau 4 — Senior'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 5,
+                                        child: Text('Niveau 5 — Expert'),
+                                      ),
                                     ],
                                     onChanged: (val) {
                                       if (val != null) {
@@ -174,7 +212,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       }
                                     },
                                   ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: TextButton.icon(
+                                      onPressed: _openPlacementQuiz,
+                                      icon: const Icon(
+                                        Icons.psychology_alt_rounded,
+                                        size: 18,
+                                      ),
+                                      label: const Text(
+                                        'Pas sûr ? Tester mon niveau en 60s',
+                                      ),
+                                    ),
+                                  ),
                                 ],
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            const SectionHeader(title: 'Application mobile'),
+                            SurfaceCard(
+                              padding: EdgeInsets.zero,
+                              child: ListTile(
+                                leading: const IconTile(
+                                  icon: Icons.install_mobile_rounded,
+                                  color: AppColors.brand,
+                                  size: 38,
+                                ),
+                                title: const Text(
+                                  'Installer l\'application sur l\'écran d\'accueil',
+                                ),
+                                subtitle: const Text(
+                                  'Plein écran instantané & accès hors-ligne (iOS Safari / Android Chrome)',
+                                ),
+                                trailing: Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: context.palette.textMuted,
+                                ),
+                                onTap: () => showPwaInstallGuideSheet(context),
                               ),
                             ),
                             const SizedBox(height: AppSpacing.lg),
@@ -200,7 +275,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       ButtonSegment(
                                         value: ThemePreference.SYSTEM,
                                         label: Text('Système'),
-                                        icon: Icon(Icons.settings_suggest_outlined),
+                                        icon: Icon(
+                                          Icons.settings_suggest_outlined,
+                                        ),
                                       ),
                                     ],
                                     selected: {_theme},
@@ -236,7 +313,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             ),
                             const SizedBox(height: AppSpacing.lg),
-                            const SectionHeader(title: 'Rappels & notifications'),
+                            const SectionHeader(
+                              title: 'Rappels & notifications',
+                            ),
                             SurfaceCard(
                               padding: EdgeInsets.zero,
                               child: Column(
@@ -259,29 +338,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     ),
                                     onTap: _pickReminderTime,
                                   ),
-                                  const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+                                  const Divider(
+                                    indent: AppSpacing.md,
+                                    endIndent: AppSpacing.md,
+                                  ),
                                   SwitchListTile(
                                     title: const Text('Leçon du jour'),
-                                    subtitle: const Text('Notification quotidienne'),
+                                    subtitle: const Text(
+                                      'Notification quotidienne',
+                                    ),
                                     value: _notifyDailyLesson,
                                     onChanged: (v) =>
                                         setState(() => _notifyDailyLesson = v),
                                   ),
-                                  const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+                                  const Divider(
+                                    indent: AppSpacing.md,
+                                    endIndent: AppSpacing.md,
+                                  ),
                                   SwitchListTile(
                                     title: const Text('Révisions'),
-                                    subtitle: const Text('Rappel des notions à consolider'),
+                                    subtitle: const Text(
+                                      'Rappel des notions à consolider',
+                                    ),
                                     value: _notifyReviews,
                                     onChanged: (v) =>
                                         setState(() => _notifyReviews = v),
                                   ),
-                                  const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+                                  const Divider(
+                                    indent: AppSpacing.md,
+                                    endIndent: AppSpacing.md,
+                                  ),
                                   SwitchListTile(
                                     title: const Text('Veille tech importante'),
-                                    subtitle: const Text('Alertes critiques uniquement'),
+                                    subtitle: const Text(
+                                      'Alertes critiques uniquement',
+                                    ),
                                     value: _notifyImportantNews,
-                                    onChanged: (v) =>
-                                        setState(() => _notifyImportantNews = v),
+                                    onChanged: (v) => setState(
+                                      () => _notifyImportantNews = v,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -377,6 +472,11 @@ class _UserHeaderCard extends StatelessWidget {
                       label: '${profile.streakDays} j de suite',
                       color: AppColors.streak,
                       icon: Icons.local_fire_department_rounded,
+                    ),
+                    TagPill(
+                      label: '${profile.streakShields} bouclier(s)',
+                      color: AppColors.backend,
+                      icon: Icons.shield_rounded,
                     ),
                   ],
                 ),

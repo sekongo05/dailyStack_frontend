@@ -4,9 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dailystack/core/theme/app_theme.dart';
 import 'package:dailystack/core/widgets/domain_badge.dart';
+import 'package:dailystack/core/widgets/ide_code_block.dart';
 import 'package:dailystack/core/widgets/state_views.dart';
 import 'package:dailystack/features/auth/screens/forgot_password_screen.dart';
 import 'package:dailystack/features/auth/screens/login_screen.dart';
+import 'package:dailystack/features/auth/screens/register_screen.dart';
 import 'package:dailystack/features/practice/models/practice_models.dart';
 import 'package:dailystack/features/practice/widgets/mastery_badge.dart';
 import 'package:dailystack/main.dart';
@@ -129,5 +131,48 @@ void main() {
     );
 
     expect(find.text('Envoyer le code'), findsOneWidget);
+  });
+
+  testWidgets('IdeCodeBlock renders uppercase language badge, copy button, and code', (WidgetTester tester) async {
+    const snippet = '''
+@Transactional
+public void processOrder(Long id) {
+  return;
+}''';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(
+          body: IdeCodeBlock(
+            code: snippet,
+            language: 'java',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('JAVA'), findsOneWidget);
+    expect(find.text('Copier'), findsOneWidget);
+    expect(
+      find.textContaining('@Transactional', findRichText: true),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('RegisterScreen displays 60s placement quiz CTA', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const RegisterScreen(),
+        ),
+      ),
+    );
+
+    expect(
+      find.text('Pas sûr ? Tester mon niveau en 60s'),
+      findsOneWidget,
+    );
   });
 }

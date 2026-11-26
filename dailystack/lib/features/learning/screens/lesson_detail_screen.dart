@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/domain_badge.dart';
+import '../../../core/widgets/ide_code_block.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
 import '../models/lesson_models.dart';
@@ -21,12 +22,18 @@ class LessonDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
+  static const _readingModeKey = 'lessonReadingMode';
+
   final ScrollController _scrollController = ScrollController();
+  late PageController _pageController;
   Timer? _scrollSaveTimer;
+
   LessonDetail? _lesson;
   List<LessonSection> _sections = [];
   List<GlobalKey> _sectionKeys = [];
   double _scrollRatio = 0.0;
+  int _currentCardIndex = 0;
+  String? _readingModePreference; // 'cards' | 'scroll'
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isCompleted = false;
@@ -35,8 +42,9 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _scrollController.addListener(_onScroll);
-    _loadLesson();
+    _loadLessonCacheFirst();
   }
 
   @override
@@ -44,7 +52,39 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     _scrollSaveTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
+  }
+
+  bool _isCardsMode(BuildContext context) {
+    if (_readingModePreference == 'cards') return true;
+    if (_readingModePreference == 'scroll') return false;
+    return MediaQuery.sizeOf(context).width < 600;
+  }
+
+  Future<void> _setReadingMode(String mode) async {
+    if (_readingModePreference == mode) return;
+    HapticFeedback.selectionClick();
+    setState(() => _readingModePreference = mode);
+    await ref.read(localDatabaseProvider).setMetadata(_readingModeKey, mode);
+
+    if (mode == 'cards') {
+      final targetIndex = _estimatedSectionIndex();
+      _currentCardIndex = targetIndex;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(targetIndex);
+        }
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        final maxExtent = _scrollController.position.maxScrollExtent;
+        if (maxExtent > 0) {
+          _scrollController.jumpTo(maxExtent * _scrollRatio);
+        }
+      });
+    }
   }
 
   void _onScroll() {
@@ -58,6 +98,22 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       setState(() => _scrollRatio = ratio);
     }
 
+    _scheduleProgressSave();
+  }
+
+  void _onCardPageChanged(int index) {
+    HapticFeedback.selectionClick();
+    final ratio = _sections.length <= 1
+        ? 1.0
+        : (index / (_sections.length - 1)).clamp(0.0, 1.0);
+    setState(() {
+      _currentCardIndex = index;
+      _scrollRatio = ratio;
+    });
+    _scheduleProgressSave();
+  }
+
+  void _scheduleProgressSave() {
     _scrollSaveTimer?.cancel();
     _scrollSaveTimer = Timer(const Duration(seconds: 2), () {
       if (mounted && !_isCompleted) {
@@ -66,24 +122,50 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     });
   }
 
-  Future<void> _loadLesson() async {
+  /// Stratégie Cache-First : affiche immédiatement la leçon pré-chargée (0 ms)
+  /// puis rafraîchit silencieusement en arrière-plan.
+  Future<void> _loadLessonCacheFirst() async {
+    final localDb = ref.read(localDatabaseProvider);
+
+    try {
+      final savedMode = await localDb.getMetadata(_readingModeKey);
+      if (savedMode == 'cards' || savedMode == 'scroll') {
+        _readingModePreference = savedMode;
+      }
+    } catch (_) {}
+
+    LessonDetail? cached;
+    try {
+      cached = await localDb.getCachedLesson(widget.lessonId);
+    } catch (_) {}
+
+    if (cached != null) {
+      _applyLoadedLesson(cached, preserveViewport: false);
+      // Rafraîchissement silencieux en arrière-plan.
+      try {
+        final fresh = await ref
+            .read(lessonServiceProvider)
+            .getLessonDetail(widget.lessonId);
+        await localDb.cacheLessons([fresh]);
+        if (mounted) {
+          _applyLoadedLesson(fresh, preserveViewport: true);
+        }
+      } catch (_) {}
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
     });
-    final localDb = ref.read(localDatabaseProvider);
+
     try {
       final detail = await ref
           .read(lessonServiceProvider)
           .getLessonDetail(widget.lessonId);
       await localDb.cacheLessons([detail]);
-      _applyLoadedLesson(detail);
+      _applyLoadedLesson(detail, preserveViewport: false);
     } catch (e) {
-      final cached = await localDb.getCachedLesson(widget.lessonId);
-      if (cached != null) {
-        _applyLoadedLesson(cached);
-        return;
-      }
       if (!mounted) return;
       setState(() {
         _error = e.toString();
@@ -92,24 +174,39 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     }
   }
 
-  void _applyLoadedLesson(LessonDetail detail) {
+  void _applyLoadedLesson(
+    LessonDetail detail, {
+    required bool preserveViewport,
+  }) {
     final sorted = [...detail.sections]
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     final savedRatio =
         (detail.userProgress?.scrollOffsetRatio ?? 0.0).clamp(0.0, 1.0);
+    final savedCardIndex = sorted.isEmpty
+        ? 0
+        : (detail.userProgress?.lastReadSectionIndex ?? 0)
+            .clamp(0, sorted.length - 1);
 
     if (!mounted) return;
     setState(() {
       _lesson = detail;
       _sections = sorted;
-      _sectionKeys = List.generate(sorted.length, (_) => GlobalKey());
-      _scrollRatio = savedRatio;
-      _isCompleted =
+      if (!preserveViewport || _sectionKeys.length != sorted.length) {
+        _sectionKeys = List.generate(sorted.length, (_) => GlobalKey());
+      }
+      if (!preserveViewport) {
+        _scrollRatio = savedRatio;
+        _currentCardIndex = savedCardIndex;
+        _pageController.dispose();
+        _pageController = PageController(initialPage: savedCardIndex);
+      }
+      _isCompleted = _isCompleted ||
           detail.userProgress?.status == LessonProgressStatus.COMPLETED;
       _isLoading = false;
+      _error = null;
     });
 
-    if (savedRatio > 0) {
+    if (!preserveViewport && savedRatio > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scrollController.hasClients) return;
         final maxExtent = _scrollController.position.maxScrollExtent;
@@ -122,6 +219,9 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
 
   int _estimatedSectionIndex() {
     if (_sections.isEmpty) return 0;
+    if (_readingModePreference == 'cards') {
+      return _currentCardIndex.clamp(0, _sections.length - 1);
+    }
     return (_scrollRatio * (_sections.length - 1)).round().clamp(
           0,
           _sections.length - 1,
@@ -216,11 +316,10 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
         backgroundColor: context.palette.surfaceAlt,
       ),
       codeblockDecoration: BoxDecoration(
-        color: context.palette.surfaceAlt,
+        color: const Color(0xFF0B1120),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: context.palette.border),
       ),
-      codeblockPadding: const EdgeInsets.all(AppSpacing.md),
+      codeblockPadding: EdgeInsets.zero,
       blockquoteDecoration: BoxDecoration(
         color: accentColor.withValues(alpha: 0.08),
         border: Border(
@@ -280,6 +379,182 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     return buffer.toString();
   }
 
+  /// Extrait les chaînes de flux d'architecture (`Client -> Gateway -> Service -> DB`)
+  /// pour offrir un diagramme mobile lisible même sur 360px.
+  List<List<String>> _extractArchitectureFlows(
+    String cleanedMarkdown, {
+    required bool isIllustrationSection,
+  }) {
+    final flows = <List<String>>[];
+    final seen = <String>{};
+    final arrowPattern = RegExp(r'\s*(?:-->|->|=>|→)\s*');
+    final minSteps = isIllustrationSection ? 2 : 3;
+
+    for (final rawLine in cleanedMarkdown.split('\n')) {
+      var line = rawLine.trim();
+      if (line.isEmpty || line.startsWith('```') || line.startsWith('//')) {
+        continue;
+      }
+      line = line
+          .replaceFirst(RegExp(r'^[-*•>]\s*'), '')
+          .replaceFirst(RegExp(r'^\d+\.\s*'), '')
+          .trim();
+      if (!arrowPattern.hasMatch(line)) continue;
+      if (line.contains('{') ||
+          line.contains('}') ||
+          line.contains(';') ||
+          line.contains('public ') ||
+          line.contains('return ')) {
+        continue;
+      }
+
+      final parts = line
+          .split(arrowPattern)
+          .map(
+            (s) => s
+                .replaceAll('`', '')
+                .replaceAll('**', '')
+                .replaceAll('[', '')
+                .replaceAll(']', '')
+                .trim(),
+          )
+          .where((s) => s.length >= 2 && s.length <= 58)
+          .toList();
+
+      if (parts.length >= minSteps) {
+        final signature = parts.join('->');
+        if (seen.add(signature)) {
+          flows.add(parts);
+        }
+      }
+    }
+    return flows;
+  }
+
+  /// Découpe le Markdown hors blocs de code pour mettre en valeur les encadrés
+  /// Anti-Pattern (`❌`) et Bonne Pratique (`✅`) tout en conservant le rendu riche.
+  List<({String kind, String content})> _segmentCallouts(String cleaned) {
+    final segments = <({String kind, String content})>[];
+    final currentLines = <String>[];
+    var currentKind = 'normal';
+    var inFence = false;
+
+    void flush() {
+      final text = currentLines.join('\n').trim();
+      if (text.isNotEmpty) {
+        segments.add((kind: currentKind, content: text));
+      }
+      currentLines.clear();
+    }
+
+    for (final line in cleaned.split('\n')) {
+      final trimmed = line.trimLeft();
+      if (trimmed.startsWith('```')) {
+        inFence = !inFence;
+        currentLines.add(line);
+        continue;
+      }
+
+      if (!inFence) {
+        final normalized = trimmed
+            .replaceFirst(RegExp(r'^[>-]\s*'), '')
+            .replaceFirst(RegExp(r'^\*\*'), '');
+        final isAntiPattern = normalized.startsWith('❌');
+        final isBestPractice = normalized.startsWith('✅');
+
+        if (isAntiPattern || isBestPractice) {
+          final targetKind = isAntiPattern ? 'anti' : 'best';
+          if (currentKind != targetKind) {
+            flush();
+            currentKind = targetKind;
+          }
+          currentLines.add(line.replaceFirst(RegExp(r'^\s*>\s*'), ''));
+          continue;
+        } else if (trimmed.isEmpty && currentKind != 'normal') {
+          flush();
+          currentKind = 'normal';
+          continue;
+        } else if (currentKind != 'normal' &&
+            (trimmed.startsWith('#') || trimmed.startsWith('```'))) {
+          flush();
+          currentKind = 'normal';
+        }
+      }
+
+      currentLines.add(line);
+    }
+    flush();
+    return segments;
+  }
+
+  Widget _buildMarkdownWithCallouts(
+    LessonSection section,
+    MarkdownStyleSheet mdStyle,
+    Color domainAccent,
+  ) {
+    final cleaned = _cleanSectionMarkdown(section.contentMarkdown);
+    final isIllustration = section.sectionType == SectionType.ILLUSTRATIONS;
+    final flows = _extractArchitectureFlows(
+      cleaned,
+      isIllustrationSection: isIllustration,
+    );
+    final segments = _segmentCallouts(cleaned);
+
+    final builders = <String, MarkdownElementBuilder>{
+      'pre': _IdePreElementBuilder(isDiagramSection: isIllustration),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (flows.isNotEmpty) ...[
+          for (final flow in flows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: _ArchitectureFlowCard(
+                steps: flow,
+                accentColor: domainAccent,
+              ),
+            ),
+        ],
+        for (var i = 0; i < segments.length; i++) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.sm + 2),
+          if (segments[i].kind == 'anti')
+            _CalloutBox(
+              title: 'Anti-pattern à éviter',
+              color: AppColors.error,
+              icon: Icons.warning_amber_rounded,
+              child: MarkdownBody(
+                data: segments[i].content,
+                selectable: true,
+                styleSheet: mdStyle,
+                builders: builders,
+              ),
+            )
+          else if (segments[i].kind == 'best')
+            _CalloutBox(
+              title: 'Bonne pratique recommandée',
+              color: AppColors.success,
+              icon: Icons.verified_rounded,
+              child: MarkdownBody(
+                data: segments[i].content,
+                selectable: true,
+                styleSheet: mdStyle,
+                builders: builders,
+              ),
+            )
+          else
+            MarkdownBody(
+              data: segments[i].content,
+              selectable: true,
+              styleSheet: mdStyle,
+              builders: builders,
+            ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildSectionBlock(
     BuildContext context,
     LessonSection section,
@@ -287,19 +562,12 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     Color domainAccent,
   ) {
     final (icon, color) = _sectionMeta(section.sectionType, domainAccent);
-    final body = MarkdownBody(
-      data: _cleanSectionMarkdown(section.contentMarkdown),
-      selectable: true,
-      styleSheet: mdStyle,
-      builders: {
-        'pre': _CodeBlockBuilder(
-          context,
-          isDiagram: section.sectionType == SectionType.ILLUSTRATIONS,
-        ),
-      },
+    final body = _buildMarkdownWithCallouts(
+      section,
+      mdStyle,
+      domainAccent,
     );
 
-    // 1. Accroche d'ouverture mise en avant dans un encadré lumineux
     if (section.sectionType == SectionType.TITLE) {
       return Container(
         width: double.infinity,
@@ -320,7 +588,6 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       );
     }
 
-    // 2. Cartes encadrées pour Objectifs, Cas réel en production et Points clés à retenir
     final isHighlightedCard = section.sectionType == SectionType.OBJECTIVES ||
         section.sectionType == SectionType.PRO_SCENARIO ||
         section.sectionType == SectionType.SUMMARY;
@@ -373,6 +640,299 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     );
   }
 
+  Widget _buildLessonHeaderMeta(LessonDetail lesson, Color domainAccent) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            DomainBadge(domainCode: lesson.domainCode),
+            if (lesson.curriculumCode != null &&
+                lesson.curriculumCode!.isNotEmpty)
+              TagPill(
+                label: lesson.curriculumCode!,
+                color: domainAccent,
+              ),
+            TagPill(
+              label: DailyLessonSummary.levelLabel(lesson.level),
+              color: AppColors.brand,
+              icon: Icons.workspace_premium_rounded,
+            ),
+            TagPill(
+              label: '${lesson.estimatedMinutes} min',
+              color: AppColors.brand,
+              icon: Icons.schedule_rounded,
+            ),
+            if (lesson.revisionDay)
+              const TagPill(
+                label: 'Révision',
+                color: AppColors.warning,
+                icon: Icons.auto_awesome_rounded,
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(lesson.title, style: context.text.headlineMedium),
+      ],
+    );
+  }
+
+  Widget _buildCompletionCard(BuildContext context) {
+    return SurfaceCard(
+      padding: const EdgeInsets.all(AppSpacing.lg - 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconTile(
+                icon: _isCompleted ? Icons.check_rounded : Icons.flag_rounded,
+                color: _isCompleted ? AppColors.success : AppColors.brand,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isCompleted ? 'Leçon terminée' : 'Fin de la leçon',
+                      style: context.text.titleMedium,
+                    ),
+                    Text(
+                      'Validez vos acquis avec les défis pratiques (QCM, diagnostic de code & étapes).',
+                      style: context.text.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (!_isCompleted) ...[
+            PrimaryButton(
+              label: 'Marquer terminée',
+              icon: Icons.check_rounded,
+              isLoading: _isSaving,
+              onPressed: () => _saveProgress(markAsCompleted: true),
+            ),
+            const SizedBox(height: AppSpacing.sm + 2),
+          ],
+          OutlinedButton.icon(
+            onPressed: () => context.push(
+              '/lessons/${widget.lessonId}/exercises',
+            ),
+            icon: const Icon(Icons.quiz_rounded),
+            label: const Text('Passer aux Défis (QCM)'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadingModeSwitch(bool cardsMode) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 740),
+          child: Row(
+            children: [
+              Expanded(
+                child: SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment<String>(
+                      value: 'cards',
+                      icon: Icon(Icons.view_carousel_outlined, size: 17),
+                      label: Text('Mode Cartes (Étapes)'),
+                    ),
+                    ButtonSegment<String>(
+                      value: 'scroll',
+                      icon: Icon(Icons.article_outlined, size: 17),
+                      label: Text('Mode Article'),
+                    ),
+                  ],
+                  selected: {cardsMode ? 'cards' : 'scroll'},
+                  onSelectionChanged: (s) => _setReadingMode(s.first),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardsModeBody(
+    BuildContext context,
+    LessonDetail lesson,
+    MarkdownStyleSheet mdStyle,
+    Color domainAccent,
+  ) {
+    final safeIndex = _currentCardIndex.clamp(0, _sections.length - 1);
+    final isFirst = safeIndex == 0;
+    final isLast = safeIndex == _sections.length - 1;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 740),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _sections.length; i++)
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _pageController.animateToPage(
+                              i,
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOutCubic,
+                            ),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              height: 5,
+                              margin: EdgeInsets.only(
+                                right: i < _sections.length - 1 ? 4 : 0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: i <= safeIndex
+                                    ? domainAccent
+                                    : context.palette.surfaceAlt,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.pill),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm + 2),
+                Text(
+                  '${safeIndex + 1} / ${_sections.length}',
+                  style: context.text.labelSmall?.copyWith(
+                    color: domainAccent,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: _sections.length,
+            onPageChanged: _onCardPageChanged,
+            itemBuilder: (context, index) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg - 4,
+                  vertical: AppSpacing.md,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 740),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (index == 0) ...[
+                          _buildLessonHeaderMeta(lesson, domainAccent),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                        _buildSectionBlock(
+                          context,
+                          _sections[index],
+                          mdStyle,
+                          domainAccent,
+                        ),
+                        if (index == _sections.length - 1) ...[
+                          const SizedBox(height: AppSpacing.xl),
+                          _buildCompletionCard(context),
+                        ],
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm + 2,
+            ),
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              border: Border(top: BorderSide(color: context.palette.border)),
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 740),
+                child: Row(
+                  children: [
+                    OutlinedButton(
+                      onPressed: isFirst
+                          ? null
+                          : () => _pageController.previousPage(
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                              ),
+                      child: const Text('← Précédent'),
+                    ),
+                    const Spacer(),
+                    if (!isLast)
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: domainAccent,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => _pageController.nextPage(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                        ),
+                        child: const Text('Étape suivante →'),
+                      )
+                    else
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: domainAccent,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => context.push(
+                          '/lessons/${widget.lessonId}/exercises',
+                        ),
+                        icon: const Icon(Icons.quiz_rounded, size: 18),
+                        label: const Text('Défis QCM →'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -387,7 +947,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
         appBar: AppBar(title: const Text('Leçon')),
         body: AppErrorView(
           message: _error ?? 'Leçon introuvable.',
-          onRetry: _loadLesson,
+          onRetry: _loadLessonCacheFirst,
         ),
       );
     }
@@ -405,6 +965,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
 
     final domainAccent = DomainBadge.colorFor(lesson.domainCode);
     final mdStyle = _markdownStyle(context, domainAccent);
+    final cardsMode = _isCardsMode(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -420,147 +981,68 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
           IconButton(
             tooltip: 'Sommaire de la leçon',
             icon: const Icon(Icons.toc_rounded),
-            onPressed: () => _showTableOfContents(context),
+            onPressed: () => _showTableOfContents(context, cardsMode),
           ),
         ],
       ),
       body: Column(
         children: [
           ProgressBar(value: _scrollRatio, height: 4, color: domainAccent),
+          _buildReadingModeSwitch(cardsMode),
           Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg - 4,
-                vertical: AppSpacing.md,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 740),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.xs,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          DomainBadge(domainCode: lesson.domainCode),
-                          if (lesson.curriculumCode != null &&
-                              lesson.curriculumCode!.isNotEmpty)
-                            TagPill(
-                              label: lesson.curriculumCode!,
-                              color: domainAccent,
-                            ),
-                          TagPill(
-                            label: DailyLessonSummary.levelLabel(lesson.level),
-                            color: AppColors.brand,
-                            icon: Icons.workspace_premium_rounded,
-                          ),
-                          TagPill(
-                            label: '${lesson.estimatedMinutes} min',
-                            color: AppColors.brand,
-                            icon: Icons.schedule_rounded,
-                          ),
-                          if (lesson.revisionDay)
-                            const TagPill(
-                              label: 'Révision',
-                              color: AppColors.warning,
-                              icon: Icons.auto_awesome_rounded,
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(lesson.title, style: context.text.headlineMedium),
-                      const SizedBox(height: AppSpacing.lg),
-                      for (var i = 0; i < _sections.length; i++) ...[
-                        Container(
-                          key: i < _sectionKeys.length ? _sectionKeys[i] : null,
-                          child: _buildSectionBlock(
-                            context,
-                            _sections[i],
-                            mdStyle,
-                            domainAccent,
-                          ),
-                        ),
-                        if (i < _sections.length - 1) ...[
-                          const SizedBox(height: AppSpacing.lg),
-                          if (_sections[i].sectionType != SectionType.TITLE)
-                            const Divider(),
-                          if (_sections[i].sectionType != SectionType.TITLE)
-                            const SizedBox(height: AppSpacing.lg),
-                        ],
-                      ],
-                      const SizedBox(height: AppSpacing.xl),
-                      SurfaceCard(
-                        padding: const EdgeInsets.all(AppSpacing.lg - 4),
+            child: cardsMode
+                ? _buildCardsModeBody(context, lesson, mdStyle, domainAccent)
+                : SingleChildScrollView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg - 4,
+                      vertical: AppSpacing.md,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 740),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                IconTile(
-                                  icon: _isCompleted
-                                      ? Icons.check_rounded
-                                      : Icons.flag_rounded,
-                                  color: _isCompleted
-                                      ? AppColors.success
-                                      : AppColors.brand,
+                            _buildLessonHeaderMeta(lesson, domainAccent),
+                            const SizedBox(height: AppSpacing.lg),
+                            for (var i = 0; i < _sections.length; i++) ...[
+                              Container(
+                                key: i < _sectionKeys.length
+                                    ? _sectionKeys[i]
+                                    : null,
+                                child: _buildSectionBlock(
+                                  context,
+                                  _sections[i],
+                                  mdStyle,
+                                  domainAccent,
                                 ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _isCompleted
-                                            ? 'Leçon terminée'
-                                            : 'Fin de la leçon',
-                                        style: context.text.titleMedium,
-                                      ),
-                                      Text(
-                                        'Validez vos acquis avec le QCM pratique.',
-                                        style: context.text.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              ),
+                              if (i < _sections.length - 1) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                if (_sections[i].sectionType !=
+                                    SectionType.TITLE)
+                                  const Divider(),
+                                if (_sections[i].sectionType !=
+                                    SectionType.TITLE)
+                                  const SizedBox(height: AppSpacing.lg),
                               ],
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            if (!_isCompleted) ...[
-                              PrimaryButton(
-                                label: 'Terminer la leçon',
-                                icon: Icons.check_rounded,
-                                isLoading: _isSaving,
-                                onPressed: () =>
-                                    _saveProgress(markAsCompleted: true),
-                              ),
-                              const SizedBox(height: AppSpacing.sm + 2),
                             ],
-                            OutlinedButton.icon(
-                              onPressed: () => context.push(
-                                '/lessons/${widget.lessonId}/exercises',
-                              ),
-                              icon: const Icon(Icons.quiz_rounded),
-                              label: const Text('Passer aux exercices'),
-                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                            _buildCompletionCard(context),
+                            const SizedBox(height: AppSpacing.lg),
                           ],
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  void _showTableOfContents(BuildContext context) {
+  void _showTableOfContents(BuildContext context, bool cardsMode) {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -591,7 +1073,13 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                 title: Text(section.title),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
-                  if (index < _sectionKeys.length) {
+                  if (cardsMode) {
+                    _pageController.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                    );
+                  } else if (index < _sectionKeys.length) {
                     final target = _sectionKeys[index].currentContext;
                     if (target != null) {
                       Scrollable.ensureVisible(
@@ -611,104 +1099,241 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   }
 }
 
-class _CodeBlockBuilder extends MarkdownElementBuilder {
-  final BuildContext parentContext;
-  final bool isDiagram;
+class _CalloutBox extends StatelessWidget {
+  final String title;
+  final Color color;
+  final IconData icon;
+  final Widget child;
 
-  _CodeBlockBuilder(this.parentContext, {this.isDiagram = false});
+  const _CalloutBox({
+    required this.title,
+    required this.color,
+    required this.icon,
+    required this.child,
+  });
 
   @override
-  Widget? visitElementAfter(element, TextStyle? preferredStyle) {
-    final code = element.textContent.trimRight();
-    if (code.isEmpty) return null;
-    final ctx = parentContext;
-    final headerLabel = isDiagram ? 'SCHÉMA VISUEL' : 'EXEMPLE DE CODE';
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border(
+          left: BorderSide(color: color, width: 4),
+          top: BorderSide(color: color.withValues(alpha: 0.25)),
+          right: BorderSide(color: color.withValues(alpha: 0.25)),
+          bottom: BorderSide(color: color.withValues(alpha: 0.25)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 17, color: color),
+              const SizedBox(width: 6),
+              Text(
+                title.toUpperCase(),
+                style: context.text.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs + 2),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _ArchitectureFlowCard extends StatelessWidget {
+  final List<String> steps;
+  final Color accentColor;
+
+  const _ArchitectureFlowCard({
+    required this.steps,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 460;
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: ctx.palette.surfaceAlt,
+        color: accentColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: ctx.palette.border),
+        border: Border.all(color: accentColor.withValues(alpha: 0.28)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: ctx.palette.border)),
-            ),
-            child: Row(
+          Row(
+            children: [
+              Icon(
+                Icons.account_tree_rounded,
+                size: 16,
+                color: accentColor,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'FLUX D\'ARCHITECTURE',
+                style: context.text.labelSmall?.copyWith(
+                  color: accentColor,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm + 4),
+          if (isCompact)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(
-                  isDiagram ? Icons.account_tree_outlined : Icons.terminal_rounded,
-                  size: 15,
-                  color: ctx.palette.textMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  headerLabel,
-                  style: ctx.text.labelSmall?.copyWith(
-                    color: ctx.palette.textMuted,
-                    letterSpacing: 0.6,
+                for (var i = 0; i < steps.length; i++) ...[
+                  _FlowNodePill(
+                    index: i + 1,
+                    label: steps[i],
+                    accentColor: accentColor,
                   ),
-                ),
-                const Spacer(),
-                InkWell(
-                  borderRadius: BorderRadius.circular(6),
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: code));
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text('Copié dans le presse-papiers'),
+                  if (i < steps.length - 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: Icon(
+                          Icons.arrow_downward_rounded,
+                          size: 18,
+                          color: accentColor,
+                        ),
                       ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.copy_rounded,
-                          size: 14,
-                          color: ctx.palette.textMuted,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Copier',
-                          style: ctx.text.labelSmall?.copyWith(
-                            color: ctx.palette.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
+                ],
+              ],
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (var i = 0; i < steps.length; i++) ...[
+                  _FlowNodePill(
+                    index: i + 1,
+                    label: steps[i],
+                    accentColor: accentColor,
                   ),
-                ),
+                  if (i < steps.length - 1)
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 18,
+                      color: accentColor,
+                    ),
+                ],
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlowNodePill extends StatelessWidget {
+  final int index;
+  final String label;
+  final Color accentColor;
+
+  const _FlowNodePill({
+    required this.index,
+    required this.label,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: accentColor.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$index',
+              style: context.text.labelSmall?.copyWith(
+                fontSize: 10.5,
+                color: accentColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: SelectableText(
-              code,
-              style: ctx.text.bodyMedium?.copyWith(
-                fontFamily: 'monospace',
-                height: 1.5,
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              style: context.text.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _IdePreElementBuilder extends MarkdownElementBuilder {
+  final bool isDiagramSection;
+
+  _IdePreElementBuilder({this.isDiagramSection = false});
+
+  @override
+  Widget? visitElementAfter(element, TextStyle? preferredStyle) {
+    final code = element.textContent.trimRight();
+    if (code.isEmpty) return null;
+
+    String? explicitLang;
+    try {
+      final children = element.children;
+      if (children != null && children.isNotEmpty) {
+        final first = children.first as dynamic;
+        final attrs = first.attributes as Map<String, String>?;
+        final cls = attrs?['class'];
+        if (cls != null && cls.startsWith('language-')) {
+          explicitLang = cls.substring('language-'.length).trim();
+        }
+      }
+    } catch (_) {}
+
+    if (explicitLang == null && isDiagramSection) {
+      final inferred = IdeCodeBlock.inferLanguage(code);
+      if (inferred == 'CODE') {
+        explicitLang = 'SCHÉMA';
+      }
+    }
+
+    return IdeCodeBlock(
+      code: code,
+      language: explicitLang,
     );
   }
 }

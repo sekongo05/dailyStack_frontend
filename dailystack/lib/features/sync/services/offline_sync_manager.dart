@@ -100,12 +100,16 @@ class OfflineSyncNotifier extends StateNotifier<OfflineSyncState> {
   Future<void> queueAttempt({
     required int exerciseId,
     int? selectedOptionId,
+    List<int>? orderedOptionIds,
     String? submittedText,
+    int? confidenceLevel,
   }) async {
     await _localDb.enqueueSyncAction('attempt', {
       'exerciseId': exerciseId,
-      'selectedOptionId': selectedOptionId,
-      'submittedText': submittedText,
+      'selectedOptionId': ?selectedOptionId,
+      'orderedOptionIds': ?orderedOptionIds,
+      'submittedText': ?submittedText,
+      'confidenceLevel': ?confidenceLevel,
       'clientTimestamp': DateTime.now().toIso8601String(),
     });
     final pending = await _localDb.getPendingCount();

@@ -1,3 +1,6 @@
+import '../../practice/models/practice_models.dart';
+import '../../watch/models/news_models.dart';
+
 enum LessonProgressStatus { LOCKED, AVAILABLE, IN_PROGRESS, COMPLETED }
 
 enum SectionType {
@@ -267,5 +270,93 @@ class Track {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'domainCode': domainCode,
+        'title': title,
+        if (description != null) 'description': description,
+        'level': level,
+        'orderIndex': orderIndex,
+        'totalLessons': totalLessons,
+        'completedLessons': completedLessons,
+        'lessons': lessons.map((l) => l.toJson()).toList(),
+      };
 }
 
+class HomeBootstrap {
+  final DailyLessonSummary todayLesson;
+  final LessonDetail? todayLessonDetail;
+  final DailyLessonSummary? tomorrowLessonPreview;
+  final LessonDetail? tomorrowLessonDetail;
+  final List<ConceptMasterySummary> dueReviews;
+  final ProgressSummary? progressSummary;
+  final List<TechNewsSummary> recentNews;
+  final int unreadNotificationsCount;
+  final int streakShields;
+
+  HomeBootstrap({
+    required this.todayLesson,
+    this.todayLessonDetail,
+    this.tomorrowLessonPreview,
+    this.tomorrowLessonDetail,
+    this.dueReviews = const [],
+    this.progressSummary,
+    this.recentNews = const [],
+    this.unreadNotificationsCount = 0,
+    this.streakShields = 1,
+  });
+
+  factory HomeBootstrap.fromJson(Map<String, dynamic> json) {
+    return HomeBootstrap(
+      todayLesson: DailyLessonSummary.fromJson(
+        json['todayLesson'] as Map<String, dynamic>,
+      ),
+      todayLessonDetail: json['todayLessonDetail'] != null
+          ? LessonDetail.fromJson(
+              json['todayLessonDetail'] as Map<String, dynamic>,
+            )
+          : null,
+      tomorrowLessonPreview: json['tomorrowLessonPreview'] != null
+          ? DailyLessonSummary.fromJson(
+              json['tomorrowLessonPreview'] as Map<String, dynamic>,
+            )
+          : null,
+      tomorrowLessonDetail: json['tomorrowLessonDetail'] != null
+          ? LessonDetail.fromJson(
+              json['tomorrowLessonDetail'] as Map<String, dynamic>,
+            )
+          : null,
+      dueReviews: (json['dueReviews'] as List<dynamic>? ?? [])
+          .map((e) => ConceptMasterySummary.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      progressSummary: json['progressSummary'] != null
+          ? ProgressSummary.fromJson(
+              json['progressSummary'] as Map<String, dynamic>,
+            )
+          : null,
+      recentNews: (json['recentNews'] as List<dynamic>? ?? [])
+          .map((e) => TechNewsSummary.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      unreadNotificationsCount:
+          (json['unreadNotificationsCount'] as num?)?.toInt() ?? 0,
+      streakShields: (json['streakShields'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'todayLesson': todayLesson.toJson(),
+        if (todayLessonDetail != null)
+          'todayLessonDetail': todayLessonDetail!.toJson(),
+        if (tomorrowLessonPreview != null)
+          'tomorrowLessonPreview': tomorrowLessonPreview!.toJson(),
+        if (tomorrowLessonDetail != null)
+          'tomorrowLessonDetail': tomorrowLessonDetail!.toJson(),
+        'dueReviews': dueReviews.map((r) => r.toJson()).toList(),
+        if (progressSummary != null)
+          'progressSummary': progressSummary!.toJson(),
+        'recentNews': recentNews.map((n) => n.toJson()).toList(),
+        'unreadNotificationsCount': unreadNotificationsCount,
+        'streakShields': streakShields,
+      };
+}

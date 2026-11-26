@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dailystack/core/network/api_response.dart';
+import 'package:dailystack/core/storage/web_kv_store.dart';
 import 'package:dailystack/features/auth/models/auth_models.dart';
 import 'package:dailystack/features/learning/models/lesson_models.dart';
 import 'package:dailystack/features/practice/models/practice_models.dart';
 import 'package:dailystack/features/sync/services/sync_service.dart';
-import 'package:dailystack/features/watch/models/news_models.dart';
 
 void main() {
   group('API models serialization & deserialization', () {
-    test('ApiResponse & AuthResponse parse correctly', () {
+    test('ApiResponse & AuthResponse parse correctly including streakShields', () {
       final json = {
         'success': true,
         'message': 'Inscription réussie',
@@ -30,6 +30,7 @@ void main() {
               'notifyDailyLesson': true,
               'notifyReviews': false,
               'notifyImportantNews': true,
+              'streakShields': 2,
             },
           },
         },
@@ -45,13 +46,16 @@ void main() {
       expect(res.data?.user.preferences?.theme, ThemePreference.DARK);
       expect(res.data?.user.preferences?.textSize, TextSizePreference.LARGE);
       expect(res.data?.user.preferences?.notifyReviews, isFalse);
+      expect(res.data?.user.preferences?.streakShields, 2);
+      expect(res.data?.user.streakShields, 2);
     });
 
-    test('LessonDetail round-trips toJson/fromJson for SQLite cache', () {
+    test('LessonDetail round-trips toJson/fromJson for SQLite & Web cache', () {
       final lesson = LessonDetail(
         id: 1,
         trackId: 1,
         trackTitle: 'Niveau 1 : Fondamentaux du Backend & API REST',
+        curriculumCode: 'B1.1',
         domainCode: 'BACKEND',
         title: 'Les Fondations du Protocole HTTP',
         estimatedMinutes: 6,
@@ -75,52 +79,153 @@ void main() {
 
       final restored = LessonDetail.fromJson(lesson.toJson());
       expect(restored.id, 1);
+      expect(restored.curriculumCode, 'B1.1');
       expect(restored.userProgress?.status, LessonProgressStatus.IN_PROGRESS);
       expect(restored.userProgress?.lastReadSectionIndex, 2);
       expect(restored.sections.first.sectionType, SectionType.TITLE);
     });
 
-    test('EvaluationResult & ProgressSummary parse mastery levels', () {
+    test('EvaluationResult round-trips correctOrderedOptionIds & SM-2 fields', () {
       final eval = EvaluationResult.fromJson({
-        'exerciseId': 1,
-        'correct': true,
-        'scoreEarned': 10,
-        'explanation': 'PUT est idempotent.',
-        'optionFeedback': 'Exactement !',
+        'exerciseId': 7,
+        'correct': false,
+        'correctOrderedOptionIds': [14, 11, 13, 12],
+        'scoreEarned': 0,
+        'explanation': 'Commencez par valider le schéma avant le commit.',
+        'optionFeedback': 'Ordre incomplet.',
         'conceptMasteryLevel': 'IN_PROGRESS',
-        'conceptScoreRatio': 1.0,
+        'conceptScoreRatio': 0.5,
+        'nextReviewDate': '2026-11-30',
+        'reviewIntervalDays': 4,
       });
 
-      expect(eval.correct, isTrue);
-      expect(eval.conceptMasteryLevel, MasteryLevel.IN_PROGRESS);
+      final restored = EvaluationResult.fromJson(eval.toJson());
+      expect(restored.correct, isFalse);
+      expect(restored.correctOrderedOptionIds, [14, 11, 13, 12]);
+      expect(restored.nextReviewDate, '2026-11-30');
+      expect(restored.reviewIntervalDays, 4);
+      expect(restored.conceptMasteryLevel, MasteryLevel.IN_PROGRESS);
+    });
 
+    test('ProgressSummary & ActivityDay round-trip 12-week heatmap & shields', () {
       final summary = ProgressSummary.fromJson({
-        'totalLessonsCompleted': 1,
-        'totalNotionsMastered': 0,
+        'totalLessonsCompleted': 8,
+        'totalNotionsMastered': 5,
         'notionsToConsolidate': 1,
-        'backendCompletionPercent': 100.0,
-        'devopsCompletionPercent': 0.0,
-        'exercisesSuccessRate': 100.0,
-        'streakDays': 3,
+        'backendCompletionPercent': 65.0,
+        'devopsCompletionPercent': 40.0,
+        'exercisesSuccessRate': 88.5,
+        'streakDays': 9,
+        'streakShields': 2,
+        'shieldUsedRecently': true,
         'dueReviewsCount': 1,
         'notions': [
           {
             'conceptId': 1,
+            'lessonId': 1,
             'conceptName': 'Idempotence des verbes HTTP',
             'domainCode': 'BACKEND',
-            'masteryLevel': 'IN_PROGRESS',
+            'masteryLevel': 'MASTERED',
             'scoreRatio': 1.0,
-            'evaluationsCount': 1,
-            'nextReviewDate': '2026-11-14',
+            'evaluationsCount': 3,
+            'nextReviewDate': '2026-12-10',
           }
+        ],
+        'activityCalendar': [
+          {
+            'date': '2026-11-25',
+            'lessonsCompleted': 1,
+            'exercisesCompleted': 3,
+            'primaryDomain': 'BACKEND',
+            'intensity': 3,
+          },
+          {
+            'date': '2026-11-26',
+            'lessonsCompleted': 1,
+            'exercisesCompleted': 4,
+            'primaryDomain': 'DEVOPS',
+            'intensity': 4,
+          },
         ],
       });
 
-      expect(summary.notions.length, 1);
-      expect(summary.notions.first.masteryLevel, MasteryLevel.IN_PROGRESS);
+      final restored = ProgressSummary.fromJson(summary.toJson());
+      expect(restored.streakShields, 2);
+      expect(restored.shieldUsedRecently, isTrue);
+      expect(restored.activityCalendar.length, 2);
+      expect(restored.activityCalendar.first.primaryDomain, 'BACKEND');
+      expect(restored.activityCalendar.last.primaryDomain, 'DEVOPS');
+      expect(restored.activityCalendar.last.intensity, 4);
+      expect(restored.notions.first.masteryLevel, MasteryLevel.MASTERED);
     });
 
-    test('SyncPullData & TechNewsSummary parse correctly', () {
+    test('HomeBootstrap & TechNewsSummary preserve J+1 preview and related curriculum links', () {
+      final bootstrapJson = {
+        'todayLesson': {
+          'id': 10,
+          'domainCode': 'BACKEND',
+          'curriculumCode': 'B2.3',
+          'level': 2,
+          'title': 'Indexation B-Tree PostgreSQL',
+          'estimatedMinutes': 6,
+          'sequenceDay': 5,
+          'revisionDay': false,
+          'status': 'AVAILABLE',
+          'lastReadSectionIndex': 0,
+          'scrollOffsetRatio': 0.0,
+        },
+        'tomorrowLessonPreview': {
+          'id': 11,
+          'domainCode': 'DEVOPS',
+          'curriculumCode': 'D2.3',
+          'level': 2,
+          'title': 'Dockerfile Multi-Stage & Sécurité',
+          'estimatedMinutes': 6,
+          'sequenceDay': 6,
+          'revisionDay': false,
+          'status': 'LOCKED',
+          'lastReadSectionIndex': 0,
+          'scrollOffsetRatio': 0.0,
+        },
+        'dueReviews': [],
+        'recentNews': [
+          {
+            'id': 42,
+            'title': 'PostgreSQL 18 : Async I/O',
+            'category': 'BACKEND',
+            'targetTechnology': 'PostgreSQL',
+            'summary': 'Gains majeurs sur les lectures séquentielles et B-Tree.',
+            'importance': 'HIGH',
+            'publishedDate': '2026-11-20',
+            'lastVerifiedDate': '2026-11-26',
+            'aiGenerated': false,
+            'bookmarked': true,
+            'relatedLessonId': 10,
+            'relatedCurriculumCode': 'B2.3',
+            'relatedLessonTitle': 'Indexation B-Tree PostgreSQL',
+          }
+        ],
+        'unreadNotificationsCount': 3,
+        'streakShields': 2,
+      };
+
+      final bootstrap = HomeBootstrap.fromJson(bootstrapJson);
+      final restored = HomeBootstrap.fromJson(bootstrap.toJson());
+
+      expect(restored.todayLesson.curriculumCode, 'B2.3');
+      expect(restored.tomorrowLessonPreview?.curriculumCode, 'D2.3');
+      expect(restored.tomorrowLessonPreview?.domainCode, 'DEVOPS');
+      expect(restored.unreadNotificationsCount, 3);
+      expect(restored.streakShields, 2);
+      expect(restored.recentNews.first.relatedLessonId, 10);
+      expect(restored.recentNews.first.relatedCurriculumCode, 'B2.3');
+      expect(
+        restored.recentNews.first.relatedLessonTitle,
+        'Indexation B-Tree PostgreSQL',
+      );
+    });
+
+    test('SyncPullData & WebKvStore round-trip cleanly', () {
       final pulled = SyncPullData.fromJson({
         'availableLessons': [],
         'cachedNews': [
@@ -135,6 +240,7 @@ void main() {
             'lastVerifiedDate': '2026-11-12',
             'aiGenerated': false,
             'bookmarked': true,
+            'relatedCurriculumCode': 'B4.1',
           }
         ],
         'serverTimestamp': '2026-11-12T01:30:00',
@@ -142,8 +248,13 @@ void main() {
 
       expect(pulled.cachedNews.length, 1);
       expect(pulled.cachedNews.first.bookmarked, isTrue);
-      expect(pulled.cachedNews.first.importance, WatchImportance.HIGH);
+      expect(pulled.cachedNews.first.relatedCurriculumCode, 'B4.1');
+
+      final store = WebKvStore();
+      store.write('test_key', 'offline_payload');
+      expect(store.read('test_key'), 'offline_payload');
+      store.remove('test_key');
+      expect(store.read('test_key'), isNull);
     });
   });
 }
-

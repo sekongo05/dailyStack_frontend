@@ -8,6 +8,19 @@ class LessonService {
 
   LessonService(this._client);
 
+  Future<HomeBootstrap> getHomeBootstrap() async {
+    try {
+      final response = await _client.dio.get('/home/bootstrap');
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => HomeBootstrap.fromJson(data as Map<String, dynamic>),
+      );
+      return apiRes.data!;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
   Future<DailyLessonSummary> getTodayLesson() async {
     try {
       final response = await _client.dio.get('/lessons/today');
@@ -24,6 +37,20 @@ class LessonService {
   Future<LessonDetail> getLessonDetail(int lessonId) async {
     try {
       final response = await _client.dio.get('/lessons/$lessonId');
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => LessonDetail.fromJson(data as Map<String, dynamic>),
+      );
+      return apiRes.data!;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
+  Future<LessonDetail> getLessonByCode(String code) async {
+    try {
+      final encodedCode = Uri.encodeComponent(code.trim());
+      final response = await _client.dio.get('/lessons/by-code/$encodedCode');
       final apiRes = ApiResponse.fromJson(
         response.data as Map<String, dynamic>,
         (data) => LessonDetail.fromJson(data as Map<String, dynamic>),
@@ -80,4 +107,3 @@ class LessonService {
     }
   }
 }
-

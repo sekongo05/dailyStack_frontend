@@ -13,6 +13,9 @@ class TechNewsSummary {
   final String lastVerifiedDate;
   final bool aiGenerated;
   final bool bookmarked;
+  final int? relatedLessonId;
+  final String? relatedCurriculumCode;
+  final String? relatedLessonTitle;
 
   TechNewsSummary({
     required this.id,
@@ -25,6 +28,9 @@ class TechNewsSummary {
     required this.lastVerifiedDate,
     required this.aiGenerated,
     required this.bookmarked,
+    this.relatedLessonId,
+    this.relatedCurriculumCode,
+    this.relatedLessonTitle,
   });
 
   factory TechNewsSummary.fromJson(Map<String, dynamic> json) {
@@ -45,6 +51,27 @@ class TechNewsSummary {
       lastVerifiedDate: json['lastVerifiedDate'] as String? ?? '',
       aiGenerated: json['aiGenerated'] as bool? ?? false,
       bookmarked: json['bookmarked'] as bool? ?? false,
+      relatedLessonId: (json['relatedLessonId'] as num?)?.toInt(),
+      relatedCurriculumCode: json['relatedCurriculumCode'] as String?,
+      relatedLessonTitle: json['relatedLessonTitle'] as String?,
+    );
+  }
+
+  TechNewsSummary copyWith({bool? bookmarked}) {
+    return TechNewsSummary(
+      id: id,
+      title: title,
+      category: category,
+      targetTechnology: targetTechnology,
+      summary: summary,
+      importance: importance,
+      publishedDate: publishedDate,
+      lastVerifiedDate: lastVerifiedDate,
+      aiGenerated: aiGenerated,
+      bookmarked: bookmarked ?? this.bookmarked,
+      relatedLessonId: relatedLessonId,
+      relatedCurriculumCode: relatedCurriculumCode,
+      relatedLessonTitle: relatedLessonTitle,
     );
   }
 
@@ -59,6 +86,11 @@ class TechNewsSummary {
         'lastVerifiedDate': lastVerifiedDate,
         'aiGenerated': aiGenerated,
         'bookmarked': bookmarked,
+        if (relatedLessonId != null) 'relatedLessonId': relatedLessonId,
+        if (relatedCurriculumCode != null)
+          'relatedCurriculumCode': relatedCurriculumCode,
+        if (relatedLessonTitle != null)
+          'relatedLessonTitle': relatedLessonTitle,
       };
 }
 
@@ -79,6 +111,9 @@ class TechNewsDetail extends TechNewsSummary {
     required super.lastVerifiedDate,
     required super.aiGenerated,
     required super.bookmarked,
+    super.relatedLessonId,
+    super.relatedCurriculumCode,
+    super.relatedLessonTitle,
     this.fullContent,
     this.changesSummary,
     this.developerImpact,
@@ -98,11 +133,45 @@ class TechNewsDetail extends TechNewsSummary {
       lastVerifiedDate: base.lastVerifiedDate,
       aiGenerated: base.aiGenerated,
       bookmarked: base.bookmarked,
+      relatedLessonId: base.relatedLessonId,
+      relatedCurriculumCode: base.relatedCurriculumCode,
+      relatedLessonTitle: base.relatedLessonTitle,
       fullContent: json['fullContent'] as String?,
       changesSummary: json['changesSummary'] as String?,
       developerImpact: json['developerImpact'] as String?,
       originalSourceUrl: json['originalSourceUrl'] as String? ?? '',
     );
   }
-}
 
+  @override
+  TechNewsDetail copyWith({bool? bookmarked}) {
+    return TechNewsDetail(
+      id: id,
+      title: title,
+      category: category,
+      targetTechnology: targetTechnology,
+      summary: summary,
+      importance: importance,
+      publishedDate: publishedDate,
+      lastVerifiedDate: lastVerifiedDate,
+      aiGenerated: aiGenerated,
+      bookmarked: bookmarked ?? this.bookmarked,
+      relatedLessonId: relatedLessonId,
+      relatedCurriculumCode: relatedCurriculumCode,
+      relatedLessonTitle: relatedLessonTitle,
+      fullContent: fullContent,
+      changesSummary: changesSummary,
+      developerImpact: developerImpact,
+      originalSourceUrl: originalSourceUrl,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        ...super.toJson(),
+        if (fullContent != null) 'fullContent': fullContent,
+        if (changesSummary != null) 'changesSummary': changesSummary,
+        if (developerImpact != null) 'developerImpact': developerImpact,
+        'originalSourceUrl': originalSourceUrl,
+      };
+}
