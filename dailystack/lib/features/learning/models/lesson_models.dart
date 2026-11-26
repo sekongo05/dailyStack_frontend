@@ -294,6 +294,7 @@ class HomeBootstrap {
   final List<TechNewsSummary> recentNews;
   final int unreadNotificationsCount;
   final int streakShields;
+  final StreakStatus streakStatus;
 
   HomeBootstrap({
     required this.todayLesson,
@@ -305,6 +306,7 @@ class HomeBootstrap {
     this.recentNews = const [],
     this.unreadNotificationsCount = 0,
     this.streakShields = 1,
+    this.streakStatus = StreakStatus.EXTINGUISHED,
   });
 
   factory HomeBootstrap.fromJson(Map<String, dynamic> json) {
@@ -341,6 +343,13 @@ class HomeBootstrap {
       unreadNotificationsCount:
           (json['unreadNotificationsCount'] as num?)?.toInt() ?? 0,
       streakShields: (json['streakShields'] as num?)?.toInt() ?? 1,
+      streakStatus: parseStreakStatus(
+        json['streakStatus'] as String?,
+        fallbackStreakDays:
+            (json['progressSummary'] as Map<String, dynamic>?)?['streakDays']
+                    as int? ??
+                0,
+      ),
     );
   }
 
@@ -358,5 +367,6 @@ class HomeBootstrap {
         'recentNews': recentNews.map((n) => n.toJson()).toList(),
         'unreadNotificationsCount': unreadNotificationsCount,
         'streakShields': streakShields,
+        'streakStatus': streakStatus.name,
       };
 }

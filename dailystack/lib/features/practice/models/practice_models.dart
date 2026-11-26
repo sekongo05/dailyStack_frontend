@@ -240,6 +240,20 @@ class ActivityDay {
       };
 }
 
+enum StreakStatus { ACTIVE_TODAY, PENDING_TODAY, FROZEN, EXTINGUISHED }
+
+StreakStatus parseStreakStatus(String? raw, {int fallbackStreakDays = 0}) {
+  return switch (raw?.toUpperCase()) {
+    'ACTIVE_TODAY' => StreakStatus.ACTIVE_TODAY,
+    'PENDING_TODAY' => StreakStatus.PENDING_TODAY,
+    'FROZEN' => StreakStatus.FROZEN,
+    'EXTINGUISHED' => StreakStatus.EXTINGUISHED,
+    _ => fallbackStreakDays > 0
+        ? StreakStatus.ACTIVE_TODAY
+        : StreakStatus.EXTINGUISHED,
+  };
+}
+
 class ProgressSummary {
   final int totalLessonsCompleted;
   final int totalNotionsMastered;
@@ -248,6 +262,7 @@ class ProgressSummary {
   final double devopsCompletionPercent;
   final double exercisesSuccessRate;
   final int streakDays;
+  final StreakStatus streakStatus;
   final int streakShields;
   final bool shieldUsedRecently;
   final int dueReviewsCount;
@@ -262,6 +277,7 @@ class ProgressSummary {
     required this.devopsCompletionPercent,
     required this.exercisesSuccessRate,
     required this.streakDays,
+    this.streakStatus = StreakStatus.EXTINGUISHED,
     this.streakShields = 1,
     this.shieldUsedRecently = false,
     required this.dueReviewsCount,
@@ -281,6 +297,10 @@ class ProgressSummary {
       exercisesSuccessRate:
           (json['exercisesSuccessRate'] as num?)?.toDouble() ?? 0.0,
       streakDays: json['streakDays'] as int? ?? 0,
+      streakStatus: parseStreakStatus(
+        json['streakStatus'] as String?,
+        fallbackStreakDays: json['streakDays'] as int? ?? 0,
+      ),
       streakShields: json['streakShields'] as int? ?? 1,
       shieldUsedRecently: json['shieldUsedRecently'] as bool? ?? false,
       dueReviewsCount: json['dueReviewsCount'] as int? ?? 0,
@@ -301,6 +321,7 @@ class ProgressSummary {
         'devopsCompletionPercent': devopsCompletionPercent,
         'exercisesSuccessRate': exercisesSuccessRate,
         'streakDays': streakDays,
+        'streakStatus': streakStatus.name,
         'streakShields': streakShields,
         'shieldUsedRecently': shieldUsedRecently,
         'dueReviewsCount': dueReviewsCount,

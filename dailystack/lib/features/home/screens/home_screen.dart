@@ -501,6 +501,77 @@ class _Greeting extends ConsumerWidget {
     );
   }
 
+  void _showStreakStatusSheet(
+    BuildContext context, {
+    required int days,
+    required StreakStatus status,
+  }) {
+    final (icon, color, title, body) = switch (status) {
+      StreakStatus.ACTIVE_TODAY => (
+          Icons.local_fire_department_rounded,
+          AppColors.streak,
+          'Flamme allumée ($days j)',
+          'Bravo ! Vous avez validé votre séance du jour et entretenu votre flamme.',
+        ),
+      StreakStatus.PENDING_TODAY => (
+          Icons.local_fire_department_outlined,
+          AppColors.warning,
+          'Flamme en attente ($days j)',
+          'Terminez la leçon du jour et sa série de QCM pour allumer votre flamme aujourd\'hui !',
+        ),
+      StreakStatus.FROZEN => (
+          Icons.ac_unit_rounded,
+          AppColors.devops,
+          'Flamme gelée & protégée ($days j)',
+          'Un bouclier a été utilisé pour sauver votre série après la séance manquée d\'hier. Validez celle d\'aujourd\'hui pour la rallumer !',
+        ),
+      StreakStatus.EXTINGUISHED => (
+          Icons.local_fire_department_outlined,
+          context.palette.textMuted,
+          'Flamme éteinte',
+          'Vous avez manqué une séance sans bouclier. Terminez la leçon du jour et ses QCM pour rallumer votre flamme à 1 !',
+        ),
+    };
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  IconTile(icon: icon, color: color, size: 46),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(title, style: ctx.text.titleLarge),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(body, style: ctx.text.bodyMedium),
+              const SizedBox(height: AppSpacing.lg),
+              PrimaryButton(
+                label: 'Compris',
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
@@ -512,6 +583,11 @@ class _Greeting extends ConsumerWidget {
     final unread = unreadFromList ?? bootstrap?.unreadNotificationsCount ?? 0;
     final streakDays =
         bootstrap?.progressSummary?.streakDays ?? user?.streakDays ?? 0;
+    final streakStatus = bootstrap?.streakStatus ??
+        bootstrap?.progressSummary?.streakStatus ??
+        (streakDays > 0
+            ? StreakStatus.ACTIVE_TODAY
+            : StreakStatus.EXTINGUISHED);
     final shields = bootstrap?.streakShields ??
         bootstrap?.progressSummary?.streakShields ??
         user?.streakShields ??
@@ -600,7 +676,15 @@ class _Greeting extends ConsumerWidget {
                   ],
                 ),
               ),
-              _StreakChip(days: streakDays),
+              _StreakChip(
+                days: streakDays,
+                status: streakStatus,
+                onTap: () => _showStreakStatusSheet(
+                  context,
+                  days: streakDays,
+                  status: streakStatus,
+                ),
+              ),
               const SizedBox(width: 6),
               _StreakShieldChip(
                 shields: shields,
@@ -667,32 +751,67 @@ class _SyncingPill extends StatelessWidget {
 
 class _StreakChip extends StatelessWidget {
   final int days;
-  const _StreakChip({required this.days});
+  final StreakStatus status;
+  final VoidCallback onTap;
+
+  const _StreakChip({
+    required this.days,
+    required this.status,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Série de $days jours',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.streak.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+    final (icon, color, bgAlpha, semantic) = switch (status) {
+      StreakStatus.ACTIVE_TODAY => (
+          Icons.local_fire_department_rounded,
+          AppColors.streak,
+          0.14,
+          'Flamme allumée : $days jours',
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.local_fire_department_rounded,
-              color: AppColors.streak,
-              size: 18,
+      StreakStatus.PENDING_TODAY => (
+          Icons.local_fire_department_outlined,
+          context.warningFg,
+          0.12,
+          'Flamme en attente : $days jours',
+        ),
+      StreakStatus.FROZEN => (
+          Icons.ac_unit_rounded,
+          AppColors.devops,
+          0.14,
+          'Flamme gelée et protégée : $days jours',
+        ),
+      StreakStatus.EXTINGUISHED => (
+          Icons.local_fire_department_outlined,
+          context.palette.textMuted,
+          0.10,
+          'Flamme éteinte : 0 jour',
+        ),
+    };
+
+    return Semantics(
+      button: true,
+      label: semantic,
+      child: Material(
+        color: color.withValues(alpha: bgAlpha),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 4),
+                Text(
+                  '$days',
+                  style: context.text.labelLarge?.copyWith(color: color),
+                ),
+              ],
             ),
-            const SizedBox(width: 4),
-            Text(
-              '$days',
-              style: context.text.labelLarge?.copyWith(color: AppColors.streak),
-            ),
-          ],
+          ),
         ),
       ),
     );
