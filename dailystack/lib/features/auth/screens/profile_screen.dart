@@ -6,6 +6,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
+import '../../home/screens/home_screen.dart';
 import '../models/auth_models.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -19,6 +20,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   UserProfile? _profile;
   ThemePreference _theme = ThemePreference.SYSTEM;
   TextSizePreference _textSize = TextSizePreference.MEDIUM;
+  int _currentLevel = 1;
   String _reminderTime = '06:00:00';
   bool _notifyDailyLesson = true;
   bool _notifyReviews = true;
@@ -48,6 +50,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _profile = profile;
         _theme = prefs.theme;
         _textSize = prefs.textSize;
+        _currentLevel = profile.currentLevel;
         _reminderTime = prefs.dailyReminderTime;
         _notifyDailyLesson = prefs.notifyDailyLesson;
         _notifyReviews = prefs.notifyReviews;
@@ -69,12 +72,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final updated = await ref.read(authServiceProvider).updatePreferences({
         'theme': _theme.name,
         'textSize': _textSize.name,
+        'currentLevel': _currentLevel,
         'dailyReminderTime': _reminderTime,
         'notifyDailyLesson': _notifyDailyLesson,
         'notifyReviews': _notifyReviews,
         'notifyImportantNews': _notifyImportantNews,
       });
+      final refreshedProfile = await ref.read(authServiceProvider).getMe();
       if (!mounted) return;
+      ref.read(currentUserProvider.notifier).state = refreshedProfile;
+      ref.invalidate(todayLessonProvider);
+      setState(() => _profile = refreshedProfile);
       applyUserPreferences(ref, updated);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Préférences enregistrées.')),
@@ -140,6 +148,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                           children: [
                             _UserHeaderCard(profile: _profile!),
+                            const SizedBox(height: AppSpacing.lg),
+                            const SectionHeader(title: 'Parcours pédagogique'),
+                            SurfaceCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Niveau actuel (alternance quotidienne Backend / DevOps)',
+                                    style: context.text.titleSmall,
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  DropdownButtonFormField<int>(
+                                    initialValue: _currentLevel,
+                                    items: const [
+                                      DropdownMenuItem(value: 1, child: Text('Niveau 1 — Amateur')),
+                                      DropdownMenuItem(value: 2, child: Text('Niveau 2 — Débutant')),
+                                      DropdownMenuItem(value: 3, child: Text('Niveau 3 — Junior')),
+                                      DropdownMenuItem(value: 4, child: Text('Niveau 4 — Senior')),
+                                      DropdownMenuItem(value: 5, child: Text('Niveau 5 — Expert')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setState(() => _currentLevel = val);
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
                             const SizedBox(height: AppSpacing.lg),
                             const SectionHeader(title: 'Apparence'),
                             SurfaceCard(

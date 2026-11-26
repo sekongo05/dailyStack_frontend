@@ -5,6 +5,7 @@ enum TextSizePreference { SMALL, MEDIUM, LARGE }
 class UserPreferences {
   final ThemePreference theme;
   final TextSizePreference textSize;
+  final int currentLevel;
   final String dailyReminderTime;
   final bool notifyDailyLesson;
   final bool notifyReviews;
@@ -13,6 +14,7 @@ class UserPreferences {
   UserPreferences({
     required this.theme,
     required this.textSize,
+    this.currentLevel = 1,
     required this.dailyReminderTime,
     required this.notifyDailyLesson,
     required this.notifyReviews,
@@ -29,6 +31,7 @@ class UserPreferences {
         (e) => e.name == json['textSize'],
         orElse: () => TextSizePreference.MEDIUM,
       ),
+      currentLevel: json['currentLevel'] as int? ?? 1,
       dailyReminderTime: json['dailyReminderTime'] as String? ?? '06:00:00',
       notifyDailyLesson: json['notifyDailyLesson'] as bool? ?? true,
       notifyReviews: json['notifyReviews'] as bool? ?? true,
@@ -39,6 +42,7 @@ class UserPreferences {
   Map<String, dynamic> toJson() => {
         'theme': theme.name,
         'textSize': textSize.name,
+        'currentLevel': currentLevel,
         'dailyReminderTime': dailyReminderTime,
         'notifyDailyLesson': notifyDailyLesson,
         'notifyReviews': notifyReviews,

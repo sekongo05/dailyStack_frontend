@@ -15,11 +15,17 @@ class AuthService {
     required String email,
     required String password,
     required String username,
+    int initialLevel = 1,
   }) async {
     try {
       final response = await _client.dio.post(
         '/auth/register',
-        data: {'email': email, 'password': password, 'username': username},
+        data: {
+          'email': email,
+          'password': password,
+          'username': username,
+          'initialLevel': initialLevel,
+        },
       );
       final apiRes = ApiResponse.fromJson(
         response.data as Map<String, dynamic>,

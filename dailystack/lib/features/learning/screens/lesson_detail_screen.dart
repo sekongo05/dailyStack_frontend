@@ -184,15 +184,35 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     }
   }
 
-  MarkdownStyleSheet _markdownStyle(BuildContext context) {
+  MarkdownStyleSheet _markdownStyle(BuildContext context, Color accentColor) {
     return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-      p: context.text.bodyLarge,
+      p: context.text.bodyLarge?.copyWith(height: 1.62),
+      pPadding: const EdgeInsets.only(bottom: 10),
       h1: context.text.headlineMedium,
       h2: context.text.headlineSmall,
-      h3: context.text.titleLarge,
-      listBullet: context.text.bodyLarge,
+      h3: context.text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+      h4: context.text.titleMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+        color: accentColor,
+      ),
+      h4Padding: const EdgeInsets.only(top: 12, bottom: 6),
+      listBullet: context.text.bodyLarge?.copyWith(color: accentColor),
+      listIndent: 20,
+      tableColumnWidth: const IntrinsicColumnWidth(),
+      tableHead: context.text.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      tableBody: context.text.bodyMedium?.copyWith(height: 1.45),
+      tableCellsPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 9,
+      ),
+      tableBorder: TableBorder.all(
+        color: context.palette.border,
+        width: 1,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
       code: context.text.bodyMedium?.copyWith(
         fontFamily: 'monospace',
+        fontWeight: FontWeight.w600,
         backgroundColor: context.palette.surfaceAlt,
       ),
       codeblockDecoration: BoxDecoration(
@@ -202,19 +222,125 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       ),
       codeblockPadding: const EdgeInsets.all(AppSpacing.md),
       blockquoteDecoration: BoxDecoration(
-        color: AppColors.brand.withValues(alpha: 0.06),
-        border: const Border(
-          left: BorderSide(color: AppColors.brand, width: 3.5),
+        color: accentColor.withValues(alpha: 0.08),
+        border: Border(
+          left: BorderSide(color: accentColor, width: 4),
         ),
         borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(AppRadius.sm),
-          bottomRight: Radius.circular(AppRadius.sm),
+          topRight: Radius.circular(AppRadius.md),
+          bottomRight: Radius.circular(AppRadius.md),
         ),
       ),
       blockquotePadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm + 2,
+        vertical: AppSpacing.sm + 4,
       ),
+    );
+  }
+
+  (IconData, Color) _sectionMeta(SectionType type, Color domainAccent) {
+    return switch (type) {
+      SectionType.TITLE => (Icons.tips_and_updates_rounded, domainAccent),
+      SectionType.INTRODUCTION => (Icons.explore_outlined, domainAccent),
+      SectionType.OBJECTIVES => (Icons.track_changes_rounded, AppColors.brand),
+      SectionType.EXPLANATION => (Icons.school_outlined, domainAccent),
+      SectionType.EXAMPLES => (Icons.code_rounded, AppColors.brand),
+      SectionType.ILLUSTRATIONS => (Icons.account_tree_outlined, domainAccent),
+      SectionType.PRO_SCENARIO => (Icons.bolt_rounded, AppColors.warning),
+      SectionType.SUMMARY => (Icons.task_alt_rounded, AppColors.success),
+    };
+  }
+
+  Widget _buildSectionBlock(
+    BuildContext context,
+    LessonSection section,
+    MarkdownStyleSheet mdStyle,
+    Color domainAccent,
+  ) {
+    final (icon, color) = _sectionMeta(section.sectionType, domainAccent);
+    final body = MarkdownBody(
+      data: section.contentMarkdown,
+      selectable: true,
+      styleSheet: mdStyle,
+      builders: {
+        'pre': _CodeBlockBuilder(
+          context,
+          isDiagram: section.sectionType == SectionType.ILLUSTRATIONS,
+        ),
+      },
+    );
+
+    // 1. Accroche d'ouverture mise en avant dans un encadré lumineux
+    if (section.sectionType == SectionType.TITLE) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: domainAccent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: domainAccent.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: domainAccent, size: 22),
+            const SizedBox(width: AppSpacing.sm + 2),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
+    // 2. Cartes encadrées pour Objectifs, Cas réel en production et Points clés à retenir
+    final isHighlightedCard = section.sectionType == SectionType.OBJECTIVES ||
+        section.sectionType == SectionType.PRO_SCENARIO ||
+        section.sectionType == SectionType.SUMMARY;
+
+    final header = Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: AppSpacing.sm + 2),
+        Expanded(
+          child: Text(section.title, style: context.text.titleLarge),
+        ),
+      ],
+    );
+
+    if (isHighlightedCard) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(AppRadius.md + 2),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header,
+            const SizedBox(height: AppSpacing.sm + 2),
+            body,
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        const SizedBox(height: AppSpacing.sm + 2),
+        body,
+      ],
     );
   }
 
@@ -248,7 +374,8 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       );
     }
 
-    final mdStyle = _markdownStyle(context);
+    final domainAccent = DomainBadge.colorFor(lesson.domainCode);
+    final mdStyle = _markdownStyle(context, domainAccent);
 
     return Scaffold(
       appBar: AppBar(
@@ -270,7 +397,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       ),
       body: Column(
         children: [
-          ProgressBar(value: _scrollRatio, height: 4),
+          ProgressBar(value: _scrollRatio, height: 4, color: domainAccent),
           Expanded(
             child: SingleChildScrollView(
               controller: _scrollController,
@@ -280,7 +407,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
               ),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
+                  constraints: const BoxConstraints(maxWidth: 740),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -290,11 +417,28 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           DomainBadge(domainCode: lesson.domainCode),
+                          if (lesson.curriculumCode != null &&
+                              lesson.curriculumCode!.isNotEmpty)
+                            TagPill(
+                              label: lesson.curriculumCode!,
+                              color: domainAccent,
+                            ),
                           TagPill(
-                            label: '${lesson.estimatedMinutes} min · Jour ${lesson.sequenceDay}',
+                            label: DailyLessonSummary.levelLabel(lesson.level),
+                            color: AppColors.brand,
+                            icon: Icons.workspace_premium_rounded,
+                          ),
+                          TagPill(
+                            label: '${lesson.estimatedMinutes} min',
                             color: AppColors.brand,
                             icon: Icons.schedule_rounded,
                           ),
+                          if (lesson.revisionDay)
+                            const TagPill(
+                              label: 'Révision',
+                              color: AppColors.warning,
+                              icon: Icons.auto_awesome_rounded,
+                            ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -303,28 +447,19 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                       for (var i = 0; i < _sections.length; i++) ...[
                         Container(
                           key: i < _sectionKeys.length ? _sectionKeys[i] : null,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (_sections[i].sectionType != SectionType.TITLE) ...[
-                                Text(_sections[i].title, style: context.text.titleLarge),
-                                const SizedBox(height: AppSpacing.sm),
-                              ],
-                              MarkdownBody(
-                                data: _sections[i].contentMarkdown,
-                                selectable: true,
-                                styleSheet: mdStyle,
-                                builders: {
-                                  'pre': _CodeBlockBuilder(context),
-                                },
-                              ),
-                            ],
+                          child: _buildSectionBlock(
+                            context,
+                            _sections[i],
+                            mdStyle,
+                            domainAccent,
                           ),
                         ),
                         if (i < _sections.length - 1) ...[
                           const SizedBox(height: AppSpacing.lg),
-                          const Divider(),
-                          const SizedBox(height: AppSpacing.lg),
+                          if (_sections[i].sectionType != SectionType.TITLE)
+                            const Divider(),
+                          if (_sections[i].sectionType != SectionType.TITLE)
+                            const SizedBox(height: AppSpacing.lg),
                         ],
                       ],
                       const SizedBox(height: AppSpacing.xl),
@@ -355,7 +490,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                                         style: context.text.titleMedium,
                                       ),
                                       Text(
-                                        'Validez vos acquis avec les exercices pratiques.',
+                                        'Validez vos acquis avec le QCM pratique.',
                                         style: context.text.bodySmall,
                                       ),
                                     ],
@@ -404,7 +539,12 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
         return SafeArea(
           child: ListView.separated(
             shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.lg,
+            ),
             itemCount: _sections.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (_, index) {
@@ -415,7 +555,8 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                   backgroundColor: AppColors.brand.withValues(alpha: 0.12),
                   child: Text(
                     '${index + 1}',
-                    style: context.text.labelSmall?.copyWith(color: AppColors.brand),
+                    style: context.text.labelSmall
+                        ?.copyWith(color: AppColors.brand),
                   ),
                 ),
                 title: Text(section.title),
@@ -443,14 +584,17 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
 
 class _CodeBlockBuilder extends MarkdownElementBuilder {
   final BuildContext parentContext;
+  final bool isDiagram;
 
-  _CodeBlockBuilder(this.parentContext);
+  _CodeBlockBuilder(this.parentContext, {this.isDiagram = false});
 
   @override
   Widget? visitElementAfter(element, TextStyle? preferredStyle) {
     final code = element.textContent.trimRight();
     if (code.isEmpty) return null;
     final ctx = parentContext;
+    final headerLabel = isDiagram ? 'SCHÉMA VISUEL' : 'EXEMPLE DE CODE';
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -459,31 +603,79 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: ctx.palette.border),
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: ctx.palette.border)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isDiagram ? Icons.account_tree_outlined : Icons.terminal_rounded,
+                  size: 15,
+                  color: ctx.palette.textMuted,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  headerLabel,
+                  style: ctx.text.labelSmall?.copyWith(
+                    color: ctx.palette.textMuted,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: code));
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Copié dans le presse-papiers'),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.copy_rounded,
+                          size: 14,
+                          color: ctx.palette.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Copier',
+                          style: ctx.text.labelSmall?.copyWith(
+                            color: ctx.palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, 48, AppSpacing.md),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: SelectableText(
               code,
               style: ctx.text.bodyMedium?.copyWith(
                 fontFamily: 'monospace',
-                height: 1.45,
+                height: 1.5,
               ),
-            ),
-          ),
-          Positioned(
-            top: 4,
-            right: 4,
-            child: IconButton(
-              tooltip: 'Copier le code',
-              icon: Icon(Icons.copy_rounded, size: 18, color: ctx.palette.textMuted),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: code));
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Code copié dans le presse-papiers')),
-                );
-              },
             ),
           ),
         ],

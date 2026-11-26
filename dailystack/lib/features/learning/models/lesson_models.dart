@@ -88,6 +88,8 @@ class UserProgress {
 class DailyLessonSummary {
   final int id;
   final String domainCode;
+  final String? curriculumCode;
+  final int level;
   final String title;
   final int estimatedMinutes;
   final int sequenceDay;
@@ -101,6 +103,8 @@ class DailyLessonSummary {
   DailyLessonSummary({
     required this.id,
     required this.domainCode,
+    this.curriculumCode,
+    this.level = 1,
     required this.title,
     required this.estimatedMinutes,
     required this.sequenceDay,
@@ -112,10 +116,21 @@ class DailyLessonSummary {
     this.colorHex,
   });
 
+  static String levelLabel(int lvl) => switch (lvl) {
+        1 => 'Niv. 1 · Amateur',
+        2 => 'Niv. 2 · Débutant',
+        3 => 'Niv. 3 · Junior',
+        4 => 'Niv. 4 · Senior',
+        5 => 'Niv. 5 · Expert',
+        _ => 'Niv. $lvl',
+      };
+
   factory DailyLessonSummary.fromJson(Map<String, dynamic> json) {
     return DailyLessonSummary(
       id: json['id'] as int,
       domainCode: json['domainCode'] as String,
+      curriculumCode: json['curriculumCode'] as String?,
+      level: json['level'] as int? ?? 1,
       title: json['title'] as String,
       estimatedMinutes: json['estimatedMinutes'] as int? ?? 5,
       sequenceDay: json['sequenceDay'] as int? ?? 1,
@@ -134,6 +149,8 @@ class DailyLessonSummary {
   Map<String, dynamic> toJson() => {
         'id': id,
         'domainCode': domainCode,
+        if (curriculumCode != null) 'curriculumCode': curriculumCode,
+        'level': level,
         'title': title,
         'estimatedMinutes': estimatedMinutes,
         'sequenceDay': sequenceDay,
@@ -150,6 +167,8 @@ class LessonDetail {
   final int id;
   final int trackId;
   final String trackTitle;
+  final int level;
+  final String? curriculumCode;
   final String domainCode;
   final String title;
   final int estimatedMinutes;
@@ -162,6 +181,8 @@ class LessonDetail {
     required this.id,
     required this.trackId,
     required this.trackTitle,
+    this.level = 1,
+    this.curriculumCode,
     required this.domainCode,
     required this.title,
     required this.estimatedMinutes,
@@ -176,6 +197,8 @@ class LessonDetail {
       id: json['id'] as int,
       trackId: json['trackId'] as int,
       trackTitle: json['trackTitle'] as String,
+      level: json['level'] as int? ?? 1,
+      curriculumCode: json['curriculumCode'] as String?,
       domainCode: json['domainCode'] as String,
       title: json['title'] as String,
       estimatedMinutes: json['estimatedMinutes'] as int? ?? 5,
@@ -194,6 +217,8 @@ class LessonDetail {
         'id': id,
         'trackId': trackId,
         'trackTitle': trackTitle,
+        'level': level,
+        if (curriculumCode != null) 'curriculumCode': curriculumCode,
         'domainCode': domainCode,
         'title': title,
         'estimatedMinutes': estimatedMinutes,

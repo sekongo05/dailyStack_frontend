@@ -221,7 +221,14 @@ class _TodayLessonHero extends StatelessWidget {
         ? 'Terminée aujourd\'hui'
         : isInProgress
             ? 'En cours'
-            : 'Leçon du jour';
+            : lesson.revisionDay
+                ? 'Révision du jour'
+                : 'Leçon du jour';
+    final codePrefix = (lesson.curriculumCode != null && lesson.curriculumCode!.isNotEmpty)
+        ? '${lesson.curriculumCode} · '
+        : '';
+    final subtitleMeta =
+        '$codePrefix${DailyLessonSummary.levelLabel(lesson.level)} · ${isBackend ? 'Backend' : 'DevOps'}';
 
     return Container(
       decoration: BoxDecoration(
@@ -261,8 +268,8 @@ class _TodayLessonHero extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Jour ${lesson.sequenceDay} · ${DomainBadge.isBackend(lesson.domainCode) ? 'Backend' : 'DevOps'}',
-            style: context.text.labelMedium?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
+            subtitleMeta,
+            style: context.text.labelMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(

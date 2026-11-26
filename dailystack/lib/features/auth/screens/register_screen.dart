@@ -18,6 +18,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  int _initialLevel = 1;
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -43,6 +44,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
             username: _usernameController.text.trim(),
+            initialLevel: _initialLevel,
           );
       ref.read(currentUserProvider.notifier).state = auth.user;
       applyUserPreferences(ref, auth.user.preferences);
@@ -122,6 +124,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
             errorText: _fieldErrors?['password'] as String?,
           ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DropdownButtonFormField<int>(
+          initialValue: _initialLevel,
+          decoration: const InputDecoration(
+            labelText: 'Votre niveau de départ',
+            prefixIcon: Icon(Icons.workspace_premium_outlined),
+          ),
+          items: const [
+            DropdownMenuItem(value: 1, child: Text('Niveau 1 — Amateur (aucune base)')),
+            DropdownMenuItem(value: 2, child: Text('Niveau 2 — Débutant (bases acquises)')),
+            DropdownMenuItem(value: 3, child: Text('Niveau 3 — Junior (premier poste)')),
+            DropdownMenuItem(value: 4, child: Text('Niveau 4 — Senior (architecture & prod)')),
+            DropdownMenuItem(value: 5, child: Text('Niveau 5 — Expert (internals & échelle)')),
+          ],
+          onChanged: (val) {
+            if (val != null) setState(() => _initialLevel = val);
+          },
         ),
         const SizedBox(height: AppSpacing.lg),
         PrimaryButton(
