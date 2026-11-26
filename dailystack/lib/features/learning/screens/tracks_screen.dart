@@ -14,6 +14,7 @@ import '../services/lesson_service.dart';
 class TracksState {
   final String? selectedDomain;
   final int? selectedLevel;
+  final bool onlyTodo;
   final List<Track> tracks;
   final bool isLoading;
   final String? error;
@@ -21,6 +22,7 @@ class TracksState {
   const TracksState({
     this.selectedDomain,
     this.selectedLevel,
+    this.onlyTodo = false,
     this.tracks = const [],
     this.isLoading = true,
     this.error,
@@ -31,6 +33,7 @@ class TracksState {
     bool clearDomain = false,
     int? selectedLevel,
     bool clearLevel = false,
+    bool? onlyTodo,
     List<Track>? tracks,
     bool? isLoading,
     String? error,
@@ -40,6 +43,7 @@ class TracksState {
       selectedDomain:
           clearDomain ? null : (selectedDomain ?? this.selectedDomain),
       selectedLevel: clearLevel ? null : (selectedLevel ?? this.selectedLevel),
+      onlyTodo: onlyTodo ?? this.onlyTodo,
       tracks: tracks ?? this.tracks,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
@@ -77,8 +81,12 @@ class TracksNotifier extends StateNotifier<TracksState> {
   }
 
   Future<void> resetFilters() async {
-    state = state.copyWith(clearDomain: true, clearLevel: true);
+    state = state.copyWith(clearDomain: true, clearLevel: true, onlyTodo: false);
     await loadTracks();
+  }
+
+  void setOnlyTodo(bool value) {
+    state = state.copyWith(onlyTodo: value);
   }
 
   Future<void> loadTracks() async {
@@ -172,6 +180,18 @@ class TracksScreen extends ConsumerWidget {
     final tracksState = ref.watch(tracksNotifierProvider);
     final notifier = ref.read(tracksNotifierProvider.notifier);
 
+    final visibleTracks = tracksState.onlyTodo
+        ? tracksState.tracks
+            .where(
+              (t) => t.lessons.any(
+                (l) =>
+                    l.status == LessonProgressStatus.IN_PROGRESS ||
+                    l.status == LessonProgressStatus.AVAILABLE,
+              ),
+            )
+            .toList()
+        : tracksState.tracks;
+
     return Scaffold(
       body: Column(
         children: [
@@ -188,7 +208,7 @@ class TracksScreen extends ConsumerWidget {
                         message: tracksState.error!,
                         onRetry: notifier.loadTracks,
                       )
-                    : tracksState.tracks.isEmpty
+                    : visibleTracks.isEmpty
                         ? AppEmptyView(
                             title: 'Aucun parcours trouvé',
                             subtitle:
@@ -206,11 +226,11 @@ class TracksScreen extends ConsumerWidget {
                                 AppSpacing.md,
                                 AppSpacing.xl,
                               ),
-                              itemCount: tracksState.tracks.length,
+                              itemCount: visibleTracks.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(height: AppSpacing.md),
                               itemBuilder: (context, index) => _TrackCard(
-                                track: tracksState.tracks[index],
+                                track: visibleTracks[index],
                                 onLessonTap: (lessonId) async {
                                   await context.push('/lessons/$lessonId');
                                   await notifier.loadTracks();
@@ -236,12 +256,21 @@ class TracksScreen extends ConsumerWidget {
       child: Row(
         children: [
           FilterChip(
+            label: const Text('À faire'),
+            selected: state.onlyTodo,
+            onSelected: notifier.setOnlyTodo,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          FilterChip(
             label: const Text('Tous'),
-            selected: state.selectedDomain == null,
-            onSelected: (_) => notifier.setFilters(
-              domain: null,
-              updateDomain: true,
-            ),
+            selected: state.selectedDomain == null && !state.onlyTodo,
+            onSelected: (_) {
+              notifier.setOnlyTodo(false);
+              notifier.setFilters(
+                domain: null,
+                updateDomain: true,
+              );
+            },
           ),
           const SizedBox(width: AppSpacing.sm),
           FilterChip(

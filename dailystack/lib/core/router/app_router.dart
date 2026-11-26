@@ -160,8 +160,14 @@ class _MainShell extends ConsumerWidget {
       bottom: false,
       child: Column(
         children: [
-          if (!syncState.isOnline)
-            OfflineBanner(pendingSync: syncState.pendingCount > 0),
+          if (!syncState.isOnline || syncState.pendingCount > 0)
+            OfflineBanner(
+              pendingSync: syncState.pendingCount > 0,
+              pendingCount: syncState.pendingCount,
+              isOnline: syncState.isOnline,
+              isSyncing: syncState.isSyncing,
+              onSyncNow: () => ref.read(offlineSyncProvider.notifier).syncNow(),
+            ),
           Expanded(
             child: Align(
               alignment: Alignment.topCenter,

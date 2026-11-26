@@ -347,7 +347,9 @@ class _Greeting extends ConsumerWidget {
     BuildContext context, {
     required int shields,
     required bool usedRecently,
+    required int completedLessons,
   }) {
+    final lessonsIntoCycle = completedLessons % 7;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -397,6 +399,22 @@ class _Greeting extends ConsumerWidget {
                 'Bouclier de série : protège automatiquement votre série si vous manquez 1 journée. +1 bouclier toutes les 7 leçons terminées (max 3).',
                 style: ctx.text.bodyMedium,
               ),
+              if (shields < 3) ...[
+                const SizedBox(height: AppSpacing.md),
+                ProgressBar(
+                  value: lessonsIntoCycle / 7,
+                  color: AppColors.brand,
+                  height: 7,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '$lessonsIntoCycle / 7 leçons avant le prochain bouclier',
+                  style: ctx.text.bodySmall?.copyWith(
+                    color: ctx.palette.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               if (usedRecently) ...[
                 const SizedBox(height: AppSpacing.md),
                 Container(
@@ -502,6 +520,8 @@ class _Greeting extends ConsumerWidget {
                   context,
                   shields: shields,
                   usedRecently: shieldUsedRecently,
+                  completedLessons:
+                      bootstrap?.progressSummary?.totalLessonsCompleted ?? 0,
                 ),
               ),
               IconButton(

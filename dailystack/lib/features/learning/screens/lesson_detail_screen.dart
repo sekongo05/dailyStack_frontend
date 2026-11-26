@@ -544,8 +544,90 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
               ),
             )
           else
+            _buildMarkdownBlockWithScrollableTables(
+              segments[i].content,
+              mdStyle,
+              builders,
+            ),
+        ],
+      ],
+    );
+  }
+
+  /// Découpe les tableaux Markdown pour les rendre scrollables horizontalement sur mobile.
+  Widget _buildMarkdownBlockWithScrollableTables(
+    String content,
+    MarkdownStyleSheet mdStyle,
+    Map<String, MarkdownElementBuilder> builders,
+  ) {
+    final lines = content.split('\n');
+    final parts = <({bool isTable, String text})>[];
+    final buffer = <String>[];
+    var inFence = false;
+    var inTable = false;
+
+    void flush() {
+      final text = buffer.join('\n').trim();
+      if (text.isNotEmpty) {
+        parts.add((isTable: inTable, text: text));
+      }
+      buffer.clear();
+    }
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final trimmed = line.trim();
+      if (trimmed.startsWith('```')) {
+        if (inTable) {
+          flush();
+          inTable = false;
+        }
+        inFence = !inFence;
+        buffer.add(line);
+        continue;
+      }
+
+      if (!inFence) {
+        final looksLikeTableLine = trimmed.startsWith('|') && trimmed.contains('|');
+        if (looksLikeTableLine && !inTable) {
+          flush();
+          inTable = true;
+        } else if (!looksLikeTableLine && inTable) {
+          flush();
+          inTable = false;
+        }
+      }
+      buffer.add(line);
+    }
+    flush();
+
+    if (parts.length <= 1 && (parts.isEmpty || !parts.first.isTable)) {
+      return MarkdownBody(
+        data: content,
+        selectable: true,
+        styleSheet: mdStyle,
+        builders: builders,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < parts.length; i++) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.sm),
+          if (parts[i].isTable)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: MarkdownBody(
+                data: parts[i].text,
+                selectable: true,
+                styleSheet: mdStyle,
+                builders: builders,
+              ),
+            )
+          else
             MarkdownBody(
-              data: segments[i].content,
+              data: parts[i].text,
               selectable: true,
               styleSheet: mdStyle,
               builders: builders,
@@ -794,8 +876,29 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     final isFirst = safeIndex == 0;
     final isLast = safeIndex == _sections.length - 1;
 
-    return Column(
-      children: [
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
+          if (!isFirst && _pageController.hasClients) {
+            _pageController.previousPage(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () {
+          if (!isLast && _pageController.hasClients) {
+            _pageController.nextPage(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Column(
+          children: [
         Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
@@ -971,6 +1074,8 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
           ),
         ),
       ],
+        ),
+      ),
     );
   }
 

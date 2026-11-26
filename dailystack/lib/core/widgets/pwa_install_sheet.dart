@@ -160,6 +160,19 @@ class _PwaInstallGuideSheetState extends State<_PwaInstallGuideSheet> {
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
+            if (canTriggerNativeInstallPrompt) ...[
+              PrimaryButton(
+                label: 'Installer maintenant (1 clic)',
+                icon: Icons.download_rounded,
+                onPressed: () async {
+                  final accepted = await triggerNativeInstallPrompt();
+                  if (accepted && context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
             SegmentedButton<bool>(
               showSelectedIcon: false,
               segments: const [

@@ -295,7 +295,33 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
     final (formatLabel, formatColor, formatIcon) =
         _formatBadgeMeta(exercise.type);
 
-    return Scaffold(
+    void selectOptionByIndex(int idx) {
+      if (_result != null || isOrdering || idx >= options.length) return;
+      HapticFeedback.selectionClick();
+      setState(() => _selectedOptionId = options[idx].id);
+    }
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.digit1): () =>
+            selectOptionByIndex(0),
+        const SingleActivator(LogicalKeyboardKey.digit2): () =>
+            selectOptionByIndex(1),
+        const SingleActivator(LogicalKeyboardKey.digit3): () =>
+            selectOptionByIndex(2),
+        const SingleActivator(LogicalKeyboardKey.digit4): () =>
+            selectOptionByIndex(3),
+        const SingleActivator(LogicalKeyboardKey.enter): () {
+          if (_result != null) {
+            _nextExercise();
+          } else if (canSubmit && (options.isNotEmpty || isOrdering)) {
+            _submit();
+          }
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       appBar: AppBar(
         title: Text('Défi ${_currentIndex + 1} sur ${_exercises.length}'),
         actions: [
@@ -461,6 +487,8 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

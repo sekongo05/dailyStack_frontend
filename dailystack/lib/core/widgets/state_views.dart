@@ -103,10 +103,33 @@ class AppErrorView extends StatelessWidget {
 
 class OfflineBanner extends StatelessWidget {
   final bool pendingSync;
-  const OfflineBanner({super.key, this.pendingSync = false});
+  final int pendingCount;
+  final bool isOnline;
+  final bool isSyncing;
+  final VoidCallback? onSyncNow;
+
+  const OfflineBanner({
+    super.key,
+    this.pendingSync = false,
+    this.pendingCount = 0,
+    this.isOnline = false,
+    this.isSyncing = false,
+    this.onSyncNow,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasPending = pendingSync || pendingCount > 0;
+    final label = !isOnline
+        ? (hasPending
+            ? (pendingCount > 0
+                ? 'Données stockées localement - en attente de synchronisation ($pendingCount)'
+                : 'Données stockées localement - en attente de synchronisation')
+            : 'Mode hors ligne • Contenu en cache disponible')
+        : (isSyncing
+            ? 'Synchronisation de $pendingCount action(s) en cours…'
+            : '$pendingCount action(s) en attente de synchronisation');
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
@@ -117,16 +140,27 @@ class OfflineBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.cloud_off_rounded, size: 18, color: AppColors.warning),
+          Icon(
+            isOnline ? Icons.sync_rounded : Icons.cloud_off_rounded,
+            size: 18,
+            color: AppColors.warning,
+          ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              pendingSync
-                  ? 'Données stockées localement - en attente de synchronisation'
-                  : 'Mode hors ligne • Contenu en cache disponible',
+              label,
               style: context.text.labelMedium,
             ),
           ),
+          if (isOnline && hasPending && !isSyncing && onSyncNow != null)
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(44, 36),
+              ),
+              onPressed: onSyncNow,
+              child: const Text('Synchroniser'),
+            ),
         ],
       ),
     );

@@ -86,6 +86,22 @@
   </div>
 
   <script>
+    window.__dsDeferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__dsDeferredPrompt = e;
+    });
+    window.__dsHasInstallPrompt = function () {
+      return window.__dsDeferredPrompt !== null;
+    };
+    window.__dsTriggerInstallPrompt = async function () {
+      var promptEvent = window.__dsDeferredPrompt;
+      if (!promptEvent) return false;
+      promptEvent.prompt();
+      var choice = await promptEvent.userChoice;
+      window.__dsDeferredPrompt = null;
+      return choice && choice.outcome === 'accepted';
+    };
     window.addEventListener('flutter-first-frame', function () {
       var splash = document.getElementById('pwa-splash');
       if (splash) {
