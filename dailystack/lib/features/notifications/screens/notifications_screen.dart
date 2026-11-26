@@ -15,12 +15,50 @@ final notificationsListProvider =
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
+  Future<void> _markAllAsRead(
+    BuildContext context,
+    WidgetRef ref,
+    List<DailyNotificationItem> unread,
+  ) async {
+    if (unread.isEmpty) return;
+    final service = ref.read(notificationServiceProvider);
+    await Future.wait(
+      unread.map((item) async {
+        try {
+          await service.markAsRead(item.id);
+        } catch (_) {}
+      }),
+    );
+    ref.invalidate(notificationsListProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Toutes les notifications ont été marquées comme lues.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncList = ref.watch(notificationsListProvider);
+    final unreadItems = asyncList.valueOrNull
+            ?.where((n) => !n.read)
+            .toList() ??
+        const <DailyNotificationItem>[];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
+      appBar: AppBar(
+        title: const Text('Notifications'),
+        actions: [
+          if (unreadItems.isNotEmpty)
+            TextButton.icon(
+              onPressed: () => _markAllAsRead(context, ref, unreadItems),
+              icon: const Icon(Icons.done_all_rounded, size: 18),
+              label: const Text('Tout lire'),
+            ),
+        ],
+      ),
       body: asyncList.when(
         loading: () =>
             const AppLoadingView(message: 'Chargement des notifications...'),

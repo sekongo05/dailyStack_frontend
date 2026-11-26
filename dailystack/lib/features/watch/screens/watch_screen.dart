@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +18,7 @@ class WatchScreen extends ConsumerStatefulWidget {
 
 class _WatchScreenState extends ConsumerState<WatchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   WatchCategory? _selectedCategory;
   bool _onlyBookmarks = false;
   List<TechNewsSummary> _items = [];
@@ -31,6 +33,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -183,13 +186,21 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         tooltip: 'Effacer la recherche',
                         icon: const Icon(Icons.clear_rounded),
                         onPressed: () {
+                          _searchDebounce?.cancel();
                           _searchController.clear();
                           _loadNews();
                         },
                       )
                     : null,
               ),
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) {
+                setState(() {});
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(
+                  const Duration(milliseconds: 400),
+                  _loadNews,
+                );
+              },
             ),
           ),
           _buildFilters(),

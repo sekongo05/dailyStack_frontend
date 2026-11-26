@@ -31,6 +31,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notifyImportantNews = true;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _hasUnsavedChanges = false;
   String? _error;
 
   @override
@@ -59,6 +60,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _notifyDailyLesson = prefs.notifyDailyLesson;
         _notifyReviews = prefs.notifyReviews;
         _notifyImportantNews = prefs.notifyImportantNews;
+        _hasUnsavedChanges = false;
         _isLoading = false;
       });
     } catch (e) {
@@ -73,7 +75,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _openPlacementQuiz() async {
     final recommended = await showLevelPlacementQuizSheet(context);
     if (recommended != null && mounted) {
-      setState(() => _currentLevel = recommended);
+      setState(() {
+        _currentLevel = recommended;
+        _hasUnsavedChanges = true;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -103,7 +108,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.read(homeBootstrapProvider.notifier).refresh();
       ref.read(tracksNotifierProvider.notifier).loadTracks();
       ref.read(progressSummaryProvider.notifier).refresh();
-      setState(() => _profile = refreshedProfile);
+      setState(() {
+        _profile = refreshedProfile;
+        _hasUnsavedChanges = false;
+      });
       applyUserPreferences(ref, updated);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Préférences enregistrées.')),
@@ -131,7 +139,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (picked != null) {
       final h = picked.hour.toString().padLeft(2, '0');
       final m = picked.minute.toString().padLeft(2, '0');
-      setState(() => _reminderTime = '$h:$m:00');
+      setState(() {
+        _reminderTime = '$h:$m:00';
+        _hasUnsavedChanges = true;
+      });
     }
   }
 
@@ -208,7 +219,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     ],
                                     onChanged: (val) {
                                       if (val != null) {
-                                        setState(() => _currentLevel = val);
+                                        setState(() {
+                                          _currentLevel = val;
+                                          _hasUnsavedChanges = true;
+                                        });
                                       }
                                     },
                                   ),
@@ -291,8 +305,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       ),
                                     ],
                                     selected: {_theme},
-                                    onSelectionChanged: (s) =>
-                                        setState(() => _theme = s.first),
+                                    onSelectionChanged: (s) {
+                                      final nextTheme = s.first;
+                                      ref
+                                          .read(themeModeProvider.notifier)
+                                          .state = switch (nextTheme) {
+                                        ThemePreference.LIGHT => ThemeMode.light,
+                                        ThemePreference.DARK => ThemeMode.dark,
+                                        ThemePreference.SYSTEM =>
+                                          ThemeMode.system,
+                                      };
+                                      setState(() {
+                                        _theme = nextTheme;
+                                        _hasUnsavedChanges = true;
+                                      });
+                                    },
                                   ),
                                   const SizedBox(height: AppSpacing.md),
                                   Text(
@@ -316,8 +343,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       ),
                                     ],
                                     selected: {_textSize},
-                                    onSelectionChanged: (s) =>
-                                        setState(() => _textSize = s.first),
+                                    onSelectionChanged: (s) {
+                                      final nextSize = s.first;
+                                      ref
+                                          .read(
+                                            textScaleFactorProvider.notifier,
+                                          )
+                                          .state = switch (nextSize) {
+                                        TextSizePreference.SMALL => 0.9,
+                                        TextSizePreference.MEDIUM => 1.0,
+                                        TextSizePreference.LARGE => 1.15,
+                                      };
+                                      setState(() {
+                                        _textSize = nextSize;
+                                        _hasUnsavedChanges = true;
+                                      });
+                                    },
                                   ),
                                 ],
                               ),
@@ -358,8 +399,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       'Notification quotidienne',
                                     ),
                                     value: _notifyDailyLesson,
-                                    onChanged: (v) =>
-                                        setState(() => _notifyDailyLesson = v),
+                                    onChanged: (v) => setState(() {
+                                      _notifyDailyLesson = v;
+                                      _hasUnsavedChanges = true;
+                                    }),
                                   ),
                                   const Divider(
                                     indent: AppSpacing.md,
@@ -371,8 +414,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       'Rappel des notions à consolider',
                                     ),
                                     value: _notifyReviews,
-                                    onChanged: (v) =>
-                                        setState(() => _notifyReviews = v),
+                                    onChanged: (v) => setState(() {
+                                      _notifyReviews = v;
+                                      _hasUnsavedChanges = true;
+                                    }),
                                   ),
                                   const Divider(
                                     indent: AppSpacing.md,
@@ -384,9 +429,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       'Alertes critiques uniquement',
                                     ),
                                     value: _notifyImportantNews,
-                                    onChanged: (v) => setState(
-                                      () => _notifyImportantNews = v,
-                                    ),
+                                    onChanged: (v) => setState(() {
+                                      _notifyImportantNews = v;
+                                      _hasUnsavedChanges = true;
+                                    }),
                                   ),
                                 ],
                               ),
@@ -414,6 +460,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ),
           ),
+          if (_hasUnsavedChanges && !_isLoading && _profile != null)
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: context.colors.surface,
+                  border: Border(
+                    top: BorderSide(color: context.palette.border),
+                  ),
+                ),
+                child: PrimaryButton(
+                  label: 'Enregistrer les modifications',
+                  icon: Icons.check_rounded,
+                  isLoading: _isSaving,
+                  onPressed: _savePreferences,
+                ),
+              ),
+            ),
         ],
       ),
     );

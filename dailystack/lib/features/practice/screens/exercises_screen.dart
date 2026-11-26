@@ -489,7 +489,15 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
                 style: context.text.bodySmall,
               ),
             ),
-            if (!hasSubmitted && _selectedOrderIds.isNotEmpty)
+            if (!hasSubmitted && _selectedOrderIds.isNotEmpty) ...[
+              IconButton(
+                tooltip: 'Annuler la dernière étape',
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedOrderIds.removeLast());
+                },
+                icon: const Icon(Icons.undo_rounded, size: 19),
+              ),
               TextButton.icon(
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -498,6 +506,7 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
                 icon: const Icon(Icons.restart_alt_rounded, size: 17),
                 label: const Text('Réinitialiser'),
               ),
+            ],
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
