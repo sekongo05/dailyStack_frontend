@@ -1,8 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/external_url_launcher.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
 import '../models/news_models.dart';
@@ -185,9 +188,10 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
                               ],
                               const SizedBox(height: AppSpacing.lg),
                               SurfaceCard(
-                                child: Text(
-                                  detail.summary,
+                                child: _LinkifiedText(
+                                  text: detail.summary,
                                   style: context.text.bodyLarge,
+                                  onLinkTap: (url) => _openSourceUrl(context, url),
                                 ),
                               ),
                               if (detail.changesSummary != null &&
@@ -222,12 +226,16 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
                               ],
                               if (detail.originalSourceUrl.isNotEmpty) ...[
                                 const SizedBox(height: AppSpacing.md),
-                                _InfoSection(
-                                  icon: Icons.link_rounded,
-                                  color: context.palette.textMuted,
-                                  title: 'Source originale',
-                                  content: detail.originalSourceUrl,
-                                  selectable: true,
+                                _SourceUrlCard(
+                                  url: detail.originalSourceUrl,
+                                  onOpen: () => _openSourceUrl(
+                                    context,
+                                    detail.originalSourceUrl,
+                                  ),
+                                  onCopy: () => _copySourceUrl(
+                                    context,
+                                    detail.originalSourceUrl,
+                                  ),
                                 ),
                               ],
                             ],
@@ -237,6 +245,27 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
                     ),
     );
   }
+  Future<void> _openSourceUrl(BuildContext context, String rawUrl) async {
+    final opened = await openExternalUrl(rawUrl);
+    if (!opened && context.mounted) {
+      await Clipboard.setData(ClipboardData(text: rawUrl));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lien copié dans le presse-papiers.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _copySourceUrl(BuildContext context, String rawUrl) async {
+    await Clipboard.setData(ClipboardData(text: rawUrl));
+    HapticFeedback.lightImpact();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Lien source copié.')),
+    );
+  }
 }
 
 class _InfoSection extends StatelessWidget {
@@ -244,14 +273,12 @@ class _InfoSection extends StatelessWidget {
   final Color color;
   final String title;
   final String content;
-  final bool selectable;
 
   const _InfoSection({
     required this.icon,
     required this.color,
     required this.title,
     required this.content,
-    this.selectable = false,
   });
 
   @override
@@ -270,16 +297,181 @@ class _InfoSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          selectable
-              ? SelectableText(
-                  content,
-                  style: context.text.bodyMedium?.copyWith(
-                    color: AppColors.brand,
+          _LinkifiedText(
+            text: content,
+            style: context.text.bodyMedium,
+            onLinkTap: (url) async {
+              final opened = await openExternalUrl(url);
+              if (!opened && context.mounted) {
+                await Clipboard.setData(ClipboardData(text: url));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Lien copié dans le presse-papiers.'),
                   ),
-                )
-              : Text(content, style: context.text.bodyMedium),
+                );
+              }
+            },
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _SourceUrlCard extends StatelessWidget {
+  final String url;
+  final VoidCallback onOpen;
+  final VoidCallback onCopy;
+
+  const _SourceUrlCard({
+    required this.url,
+    required this.onOpen,
+    required this.onCopy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      onTap: onOpen,
+      borderColor: AppColors.brand.withValues(alpha: 0.35),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconTile(
+                icon: Icons.link_rounded,
+                color: AppColors.brand,
+                size: 36,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Source originale',
+                  style: context.text.titleMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Copier le lien',
+                onPressed: onCopy,
+                icon: Icon(
+                  Icons.copy_rounded,
+                  size: 18,
+                  color: context.palette.textMuted,
+                ),
+              ),
+              const Icon(
+                Icons.open_in_new_rounded,
+                size: 18,
+                color: AppColors.brand,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            url,
+            style: context.text.bodyMedium?.copyWith(
+              color: AppColors.brand,
+              decoration: TextDecoration.underline,
+              decorationColor: AppColors.brand,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LinkifiedText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+  final ValueChanged<String> onLinkTap;
+
+  const _LinkifiedText({
+    required this.text,
+    this.style,
+    required this.onLinkTap,
+  });
+
+  @override
+  State<_LinkifiedText> createState() => _LinkifiedTextState();
+}
+
+class _LinkifiedTextState extends State<_LinkifiedText> {
+  static final RegExp _urlRegex = RegExp(
+    r'https?://[^\s<>\[\]()]+',
+    caseSensitive: false,
+  );
+
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+
+    final matches = _urlRegex.allMatches(widget.text).toList();
+    if (matches.isEmpty) {
+      return Text(widget.text, style: widget.style);
+    }
+
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+
+    for (final match in matches) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: widget.text.substring(cursor, match.start)));
+      }
+      var rawUrl = match.group(0)!;
+      var suffix = '';
+      while (rawUrl.isNotEmpty &&
+          (rawUrl.endsWith('.') ||
+              rawUrl.endsWith(',') ||
+              rawUrl.endsWith(';') ||
+              rawUrl.endsWith(':'))) {
+        suffix = '${rawUrl[rawUrl.length - 1]}$suffix';
+        rawUrl = rawUrl.substring(0, rawUrl.length - 1);
+      }
+
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () => widget.onLinkTap(rawUrl);
+      _recognizers.add(recognizer);
+
+      spans.add(
+        TextSpan(
+          text: rawUrl,
+          recognizer: recognizer,
+          style: widget.style?.copyWith(
+            color: AppColors.brand,
+            decoration: TextDecoration.underline,
+            decorationColor: AppColors.brand,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+      if (suffix.isNotEmpty) {
+        spans.add(TextSpan(text: suffix));
+      }
+      cursor = match.end;
+    }
+
+    if (cursor < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(cursor)));
+    }
+
+    return SelectableText.rich(
+      TextSpan(style: widget.style, children: spans),
     );
   }
 }
