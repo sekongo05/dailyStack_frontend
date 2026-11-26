@@ -265,40 +265,52 @@ class HomeScreen extends ConsumerWidget {
                   const PwaInstallBanner(),
                   if (tomorrowPreview != null &&
                       MediaQuery.sizeOf(context).width >= 840)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: _TodayLessonHero(
-                            lesson: lesson,
-                            onOpen: () async {
-                              await context.push('/lessons/${lesson.id}');
-                              await _refreshAll(ref);
-                            },
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _TodayLessonHero(
+                              lesson: lesson,
+                              onOpen: () async {
+                                await context.push('/lessons/${lesson.id}');
+                                await _refreshAll(ref);
+                              },
+                              onOpenExercises: () async {
+                                await context.push(
+                                  '/lessons/${lesson.id}/exercises',
+                                );
+                                await _refreshAll(ref);
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          flex: 2,
-                          child: _TomorrowPreviewCard(
-                            lesson: tomorrowPreview,
-                            isOfflineReady: isTomorrowCached,
-                            onTap: () async {
-                              await context.push(
-                                '/lessons/${tomorrowPreview.id}',
-                              );
-                              await _refreshAll(ref);
-                            },
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            flex: 2,
+                            child: _TomorrowPreviewCard(
+                              lesson: tomorrowPreview,
+                              isOfflineReady: isTomorrowCached,
+                              onTap: () async {
+                                await context.push(
+                                  '/lessons/${tomorrowPreview.id}',
+                                );
+                                await _refreshAll(ref);
+                              },
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     )
                   else ...[
                     _TodayLessonHero(
                       lesson: lesson,
                       onOpen: () async {
                         await context.push('/lessons/${lesson.id}');
+                        await _refreshAll(ref);
+                      },
+                      onOpenExercises: () async {
+                        await context.push('/lessons/${lesson.id}/exercises');
                         await _refreshAll(ref);
                       },
                     ),
@@ -316,6 +328,7 @@ class HomeScreen extends ConsumerWidget {
                   ],
                   const SizedBox(height: AppSpacing.lg),
                   _StatsRow(summary: bootstrap?.progressSummary),
+                  _DomainProgressMiniCard(summary: bootstrap?.progressSummary),
                   _ReviewsCard(
                     reviews: bootstrap?.dueReviews ?? const [],
                     onTap: () async {
@@ -506,6 +519,13 @@ class _Greeting extends ConsumerWidget {
     final shieldUsedRecently =
         bootstrap?.progressSummary?.shieldUsedRecently ?? false;
     final name = user?.username;
+    final initial = (name != null && name.isNotEmpty)
+        ? name[0].toUpperCase()
+        : 'D';
+    final showAvatar = MediaQuery.sizeOf(context).width >= 360;
+    final levelBadge = user != null
+        ? 'Niveau ${user.currentLevel} · ${DailyLessonSummary.levelLabel(user.currentLevel)}'
+        : null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -519,6 +539,29 @@ class _Greeting extends ConsumerWidget {
         children: [
           Row(
             children: [
+              if (showAvatar) ...[
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.brand, AppColors.brandDark],
+                    ),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: context.text.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm + 4),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,6 +585,18 @@ class _Greeting extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (levelBadge != null) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        levelBadge,
+                        style: context.text.labelSmall?.copyWith(
+                          color: AppColors.brand,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -692,8 +747,13 @@ class _StreakShieldChip extends StatelessWidget {
 class _TodayLessonHero extends StatelessWidget {
   final DailyLessonSummary lesson;
   final VoidCallback onOpen;
+  final VoidCallback onOpenExercises;
 
-  const _TodayLessonHero({required this.lesson, required this.onOpen});
+  const _TodayLessonHero({
+    required this.lesson,
+    required this.onOpen,
+    required this.onOpenExercises,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -709,9 +769,7 @@ class _TodayLessonHero extends StatelessWidget {
 
     final (ctaLabel, ctaIcon) = isInProgress
         ? ('Continuer ($progressPercent%)', Icons.play_arrow_rounded)
-        : isCompleted
-            ? ('Relire la leçon', Icons.replay_rounded)
-            : ('Commencer', Icons.arrow_forward_rounded);
+        : ('Commencer', Icons.arrow_forward_rounded);
     final statusLabel = isCompleted
         ? 'Terminée aujourd\'hui'
         : isInProgress
@@ -725,6 +783,7 @@ class _TodayLessonHero extends StatelessWidget {
             : '';
     final subtitleMeta =
         '$codePrefix${DailyLessonSummary.levelLabel(lesson.level)} · ${isBackend ? 'Backend' : 'DevOps'}';
+    final isCompact = MediaQuery.sizeOf(context).width < 400;
 
     return Container(
       decoration: BoxDecoration(
@@ -746,70 +805,148 @@ class _TodayLessonHero extends StatelessWidget {
           ),
         ],
       ),
-      padding: EdgeInsets.all(
-        MediaQuery.sizeOf(context).width < 400
-            ? AppSpacing.md
-            : AppSpacing.lg - 4,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.xs,
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
+          Positioned(
+            right: -36,
+            top: -36,
+            child: IgnorePointer(
+              child: Container(
+                width: 160,
+                height: 160,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      accentColor.withValues(alpha: 0.24),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(
+              isCompact ? AppSpacing.md : AppSpacing.lg - 4,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _HeroPill(
-                  icon: isCompleted
-                      ? Icons.check_circle_rounded
-                      : DomainBadge.iconFor(lesson.domainCode),
-                  label: statusLabel,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.xs,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _HeroPill(
+                            icon: isCompleted
+                                ? Icons.check_circle_rounded
+                                : DomainBadge.iconFor(lesson.domainCode),
+                            label: statusLabel,
+                          ),
+                          _HeroPill(
+                            icon: Icons.schedule_rounded,
+                            label: '${lesson.estimatedMinutes} min',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      subtitleMeta,
+                      style: context.text.labelMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      lesson.title,
+                      style: context.text.headlineSmall?.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (isInProgress) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        child: LinearProgressIndicator(
+                          value: lesson.scrollOffsetRatio.clamp(0.0, 1.0),
+                          minHeight: 6,
+                          color: Colors.white,
+                          backgroundColor:
+                              Colors.white.withValues(alpha: 0.25),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                _HeroPill(
-                  icon: Icons.schedule_rounded,
-                  label: '${lesson.estimatedMinutes} min',
-                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (isCompleted)
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: accentColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                          ),
+                          onPressed: onOpenExercises,
+                          icon: const Icon(Icons.quiz_rounded, size: 18),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Défis QCM', maxLines: 1),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.35),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                            ),
+                          ),
+                          onPressed: onOpen,
+                          icon: const Icon(Icons.replay_rounded, size: 18),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Relire', maxLines: 1),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: onOpen,
+                      icon: Icon(ctaIcon),
+                      label: Text(ctaLabel),
+                    ),
+                  ),
               ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            subtitleMeta,
-            style: context.text.labelMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.85),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            lesson.title,
-            style: context.text.headlineSmall?.copyWith(color: Colors.white),
-          ),
-          if (isInProgress) ...[
-            const SizedBox(height: AppSpacing.md),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              child: LinearProgressIndicator(
-                value: lesson.scrollOffsetRatio.clamp(0.0, 1.0),
-                minHeight: 6,
-                color: Colors.white,
-                backgroundColor: Colors.white.withValues(alpha: 0.25),
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: onOpen,
-              icon: Icon(ctaIcon),
-              label: Text(ctaLabel),
             ),
           ),
         ],
@@ -968,6 +1105,81 @@ class _StatsRow extends StatelessWidget {
   }
 }
 
+class _DomainProgressMiniCard extends StatelessWidget {
+  final ProgressSummary? summary;
+  const _DomainProgressMiniCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    if (summary == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm + 2),
+      child: SurfaceCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm + 4,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _MiniDomainBar(
+                label: 'Backend',
+                percent: summary!.backendCompletionPercent,
+                color: AppColors.backend,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _MiniDomainBar(
+                label: 'DevOps',
+                percent: summary!.devopsCompletionPercent,
+                color: AppColors.devops,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniDomainBar extends StatelessWidget {
+  final String label;
+  final double percent;
+  final Color color;
+
+  const _MiniDomainBar({
+    required this.label,
+    required this.percent,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: context.text.labelSmall),
+            Text(
+              '${percent.round()}%',
+              style: context.text.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        ProgressBar(value: percent / 100, color: color, height: 6),
+      ],
+    );
+  }
+}
+
 class _ReviewsCard extends StatelessWidget {
   final List<ConceptMasterySummary> reviews;
   final VoidCallback onTap;
@@ -982,6 +1194,8 @@ class _ReviewsCard extends StatelessWidget {
       padding: const EdgeInsets.only(top: AppSpacing.md),
       child: SurfaceCard(
         onTap: onTap,
+        color: AppColors.warning.withValues(alpha: 0.05),
+        borderColor: AppColors.warning.withValues(alpha: 0.35),
         child: Row(
           children: [
             const IconTile(
@@ -993,7 +1207,21 @@ class _ReviewsCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Révision disponible', style: context.text.titleSmall),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Révision disponible',
+                          style: context.text.titleSmall,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      TagPill(
+                        label: '${reviews.length} à revoir',
+                        color: AppColors.warning,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     '${reviews.length} notion${reviews.length > 1 ? 's' : ''} à consolider aujourd\'hui',
@@ -1067,22 +1295,19 @@ class _NewsRow extends StatelessWidget {
                 children: [
                   Wrap(
                     spacing: AppSpacing.xs + 2,
-                    runSpacing: 2,
+                    runSpacing: 4,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text(
-                        item.targetTechnology.toUpperCase(),
-                        style: context.text.labelSmall?.copyWith(
-                          color: AppColors.brand,
-                        ),
+                      TagPill(
+                        label: item.targetTechnology.toUpperCase(),
+                        color: AppColors.brand,
                       ),
                       if (item.relatedCurriculumCode != null &&
                           item.relatedCurriculumCode!.isNotEmpty)
-                        Text(
-                          '· Cours ${item.relatedCurriculumCode}',
-                          style: context.text.labelSmall?.copyWith(
-                            color: AppColors.backend,
-                          ),
+                        TagPill(
+                          label: 'Cours ${item.relatedCurriculumCode}',
+                          color: AppColors.backend,
+                          icon: Icons.school_rounded,
                         ),
                     ],
                   ),
