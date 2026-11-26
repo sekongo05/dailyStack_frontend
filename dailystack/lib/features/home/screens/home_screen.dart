@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/notifications/web_notification_helper.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/storage/local_database.dart';
 import '../../../core/theme/app_theme.dart';
@@ -218,6 +219,21 @@ class HomeScreen extends ConsumerWidget {
   Future<void> _refreshAll(WidgetRef ref) async {
     await ref.read(homeBootstrapProvider.notifier).refresh();
     ref.invalidate(notificationsListProvider);
+    _syncWebPushTokenIfGranted(ref);
+  }
+
+  Future<void> _syncWebPushTokenIfGranted(WidgetRef ref) async {
+    if (!isWebNotificationSupported || webNotificationPermission != 'granted') {
+      return;
+    }
+    try {
+      final token = await fetchWebFcmToken(promptIfNeeded: false);
+      if (token != null) {
+        await ref
+            .read(notificationServiceProvider)
+            .registerDeviceToken(token, platform: 'web');
+      }
+    } catch (_) {}
   }
 
   @override

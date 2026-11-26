@@ -4,3 +4,5 @@ bool get isWebNotificationSupported => false;
 String get webNotificationPermission => 'unsupported';
 
 Future<String> requestWebNotificationPermission() async => 'unsupported';
+
+Future<String?> fetchWebFcmToken({bool promptIfNeeded = false}) async => null;

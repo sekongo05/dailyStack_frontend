@@ -1,5 +1,9 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
+import 'dart:js_interop';
+
+@JS('__dsGetFcmToken')
+external JSPromise<JSString> _jsGetFcmToken(bool promptIfNeeded);
 
 bool get isWebNotificationSupported => html.Notification.supported;
 
@@ -18,5 +22,14 @@ Future<String> requestWebNotificationPermission() async {
     return await html.Notification.requestPermission();
   } catch (_) {
     return 'denied';
+  }
+}
+
+Future<String?> fetchWebFcmToken({bool promptIfNeeded = false}) async {
+  try {
+    final token = (await _jsGetFcmToken(promptIfNeeded).toDart).toDart;
+    return token.trim().isEmpty ? null : token.trim();
+  } catch (_) {
+    return null;
   }
 }

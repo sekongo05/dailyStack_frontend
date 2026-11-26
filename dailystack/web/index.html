@@ -85,7 +85,56 @@
     <div class="spinner"></div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
   <script>
+    (function () {
+      var firebaseConfig = {
+        apiKey: "AIzaSyBLr01wIt85M4bXFSKHnjZcGUKAKqPkJPI",
+        authDomain: "dailystack-app.firebaseapp.com",
+        projectId: "dailystack-app",
+        storageBucket: "dailystack-app.firebasestorage.app",
+        messagingSenderId: "830598198131",
+        appId: "1:830598198131:web:9b1a2f93c876d5c8504b06",
+        measurementId: "G-6E67WGHPRK"
+      };
+      var vapidKey = "BAqLVnunfQlSkSUD6IiDmzshdqh-teNwmbO-EAQ7CGrCZoxkLCYVvJ9Qc0qeve7FtW_gPBgNO4Ca7BnxYUiXrsg";
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        var messaging = firebase.messaging();
+        messaging.onMessage(function (payload) {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            var n = payload.notification || {};
+            new Notification(n.title || 'DailyStack', {
+              body: n.body || '',
+              icon: '/icons/Icon-192.png'
+            });
+          }
+        });
+        window.__dsGetFcmToken = async function (promptIfNeeded) {
+          if (typeof Notification === 'undefined' || !('serviceWorker' in navigator)) {
+            return '';
+          }
+          var perm = Notification.permission;
+          if (perm !== 'granted') {
+            if (!promptIfNeeded) return '';
+            perm = await Notification.requestPermission();
+            if (perm !== 'granted') return '';
+          }
+          var swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          var token = await messaging.getToken({
+            vapidKey: vapidKey,
+            serviceWorkerRegistration: swReg
+          });
+          return token || '';
+        };
+      } catch (e) {
+        window.__dsGetFcmToken = async function () { return ''; };
+      }
+    })();
+
     window.__dsDeferredPrompt = null;
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();

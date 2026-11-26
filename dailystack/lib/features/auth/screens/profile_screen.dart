@@ -465,16 +465,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       onTap: () async {
                                         final messenger =
                                             ScaffoldMessenger.of(context);
+                                        final notifService = ref.read(
+                                          notificationServiceProvider,
+                                        );
                                         final status =
                                             await requestWebNotificationPermission();
+                                        var registered = false;
+                                        if (status == 'granted') {
+                                          final token = await fetchWebFcmToken(
+                                            promptIfNeeded: false,
+                                          );
+                                          if (token != null) {
+                                            try {
+                                              await notifService
+                                                  .registerDeviceToken(
+                                                token,
+                                                platform: 'web',
+                                              );
+                                              registered = true;
+                                            } catch (_) {}
+                                          }
+                                        }
                                         if (!mounted) return;
                                         setState(() {});
                                         messenger.showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              status == 'granted'
-                                                  ? 'Alertes navigateur activées !'
-                                                  : 'Permission notifications : $status',
+                                              registered
+                                                  ? 'Alertes navigateur et Push activés sur cet appareil !'
+                                                  : status == 'granted'
+                                                      ? 'Alertes navigateur activées !'
+                                                      : 'Permission notifications : $status',
                                             ),
                                           ),
                                         );
