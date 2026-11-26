@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
+import '../models/auth_models.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -28,19 +29,35 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       return;
     }
 
-    try {
-      final profile = await authService.getMe();
-      if (!mounted) return;
-      ref.read(currentUserProvider.notifier).state = profile;
-      applyUserPreferences(ref, profile.preferences);
-      ref.read(offlineSyncProvider.notifier).syncNow();
-      context.go('/home');
-    } catch (_) {
-      if (!mounted) return;
-      final stillHasSession = await authService.hasStoredSession();
-      if (!mounted) return;
-      context.go(stillHasSession ? '/home' : '/login');
-    }
+    // Passage immédiat vers /home : HomeBootstrapNotifier charge le cache local en 0 ms
+    // tandis que le profil et la synchro se rafraîchissent en arrière-plan.
+    if (!mounted) return;
+    final container = ProviderScope.containerOf(context, listen: false);
+    context.go('/home');
+
+    Future<void>(() async {
+      try {
+        final profile = await authService.getMe();
+        container.read(currentUserProvider.notifier).state = profile;
+        final prefs = profile.preferences;
+        if (prefs != null) {
+          container.read(themeModeProvider.notifier).state = switch (prefs.theme) {
+            ThemePreference.LIGHT => ThemeMode.light,
+            ThemePreference.DARK => ThemeMode.dark,
+            ThemePreference.SYSTEM => ThemeMode.system,
+          };
+          container.read(textScaleFactorProvider.notifier).state =
+              switch (prefs.textSize) {
+            TextSizePreference.SMALL => 0.9,
+            TextSizePreference.MEDIUM => 1.0,
+            TextSizePreference.LARGE => 1.15,
+          };
+        }
+        container.read(offlineSyncProvider.notifier).syncNow();
+      } catch (_) {
+        // Le DioClient redirigera vers /login si la session a expiré (401 + refresh échoué).
+      }
+    });
   }
 
   @override

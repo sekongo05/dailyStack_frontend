@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/network/api_response.dart';
+import '../../../core/notifications/web_notification_helper.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/pwa_install_sheet.dart';
@@ -434,6 +435,52 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       _hasUnsavedChanges = true;
                                     }),
                                   ),
+                                  if (isWebNotificationSupported) ...[
+                                    const Divider(
+                                      indent: AppSpacing.md,
+                                      endIndent: AppSpacing.md,
+                                    ),
+                                    ListTile(
+                                      leading: const IconTile(
+                                        icon: Icons.notifications_active_outlined,
+                                        color: AppColors.brand,
+                                        size: 38,
+                                      ),
+                                      title: const Text('Alertes navigateur (PWA)'),
+                                      subtitle: Text(
+                                        webNotificationPermission == 'granted'
+                                            ? 'Autorisées sur cet appareil'
+                                            : webNotificationPermission == 'denied'
+                                                ? 'Bloquées dans les réglages du navigateur'
+                                                : 'Appuyez pour autoriser les rappels',
+                                      ),
+                                      trailing: Icon(
+                                        webNotificationPermission == 'granted'
+                                            ? Icons.check_circle_rounded
+                                            : Icons.chevron_right_rounded,
+                                        color: webNotificationPermission == 'granted'
+                                            ? AppColors.success
+                                            : context.palette.textMuted,
+                                      ),
+                                      onTap: () async {
+                                        final messenger =
+                                            ScaffoldMessenger.of(context);
+                                        final status =
+                                            await requestWebNotificationPermission();
+                                        if (!mounted) return;
+                                        setState(() {});
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              status == 'granted'
+                                                  ? 'Alertes navigateur activées !'
+                                                  : 'Permission notifications : $status',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
