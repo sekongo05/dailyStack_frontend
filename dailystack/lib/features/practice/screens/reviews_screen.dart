@@ -65,49 +65,96 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.md),
               itemCount: reviews.length,
-              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm + 2),
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: AppSpacing.sm + 2),
               itemBuilder: (context, index) {
                 final notion = reviews[index];
                 final percent = (notion.scoreRatio * 100).round();
                 final (_, color, _) = MasteryBadge.styleFor(notion.masteryLevel);
+                final lessonId = notion.lessonId;
 
                 return SurfaceCard(
-                  child: Row(
+                  onTap: lessonId != null
+                      ? () async {
+                          await context.push('/lessons/$lessonId/exercises');
+                          _refresh();
+                        }
+                      : null,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      ProgressRing(
-                        value: notion.scoreRatio,
-                        size: 52,
-                        color: color,
-                        stroke: 5,
-                        center: Text(
-                          '$percent%',
-                          style: context.text.labelSmall?.copyWith(color: color),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: AppSpacing.xs + 2,
-                              runSpacing: AppSpacing.xs,
+                      Row(
+                        children: [
+                          ProgressRing(
+                            value: notion.scoreRatio,
+                            size: 52,
+                            color: color,
+                            stroke: 5,
+                            center: Text(
+                              '$percent%',
+                              style: context.text.labelSmall
+                                  ?.copyWith(color: color),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                DomainBadge(domainCode: notion.domainCode),
-                                MasteryBadge(level: notion.masteryLevel),
+                                Wrap(
+                                  spacing: AppSpacing.xs + 2,
+                                  runSpacing: AppSpacing.xs,
+                                  children: [
+                                    DomainBadge(domainCode: notion.domainCode),
+                                    MasteryBadge(level: notion.masteryLevel),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  notion.conceptName,
+                                  style: context.text.titleMedium,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${notion.evaluationsCount} évaluation(s)'
+                                  '${notion.nextReviewDate != null ? ' · Échéance ${notion.nextReviewDate}' : ''}',
+                                  style: context.text.bodySmall,
+                                ),
                               ],
                             ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(notion.conceptName, style: context.text.titleMedium),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${notion.evaluationsCount} évaluation(s)'
-                              '${notion.nextReviewDate != null ? ' · Échéance ${notion.nextReviewDate}' : ''}',
-                              style: context.text.bodySmall,
+                          ),
+                        ],
+                      ),
+                      if (lessonId != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: () async {
+                                  await context
+                                      .push('/lessons/$lessonId/exercises');
+                                  _refresh();
+                                },
+                                icon: const Icon(Icons.quiz_rounded, size: 18),
+                                label: const Text('Lancer le QCM'),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await context.push('/lessons/$lessonId');
+                                _refresh();
+                              },
+                              icon: const Icon(
+                                Icons.menu_book_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('Cours'),
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 );

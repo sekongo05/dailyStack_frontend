@@ -74,6 +74,7 @@ class Exercise {
 
 class EvaluationResult {
   final int exerciseId;
+  final int? correctOptionId;
   final bool correct;
   final int scoreEarned;
   final String explanation;
@@ -83,6 +84,7 @@ class EvaluationResult {
 
   EvaluationResult({
     required this.exerciseId,
+    this.correctOptionId,
     required this.correct,
     required this.scoreEarned,
     required this.explanation,
@@ -94,6 +96,7 @@ class EvaluationResult {
   factory EvaluationResult.fromJson(Map<String, dynamic> json) {
     return EvaluationResult(
       exerciseId: json['exerciseId'] as int,
+      correctOptionId: json['correctOptionId'] as int?,
       correct: json['correct'] as bool? ?? false,
       scoreEarned: json['scoreEarned'] as int? ?? 0,
       explanation: json['explanation'] as String? ?? '',
@@ -109,6 +112,7 @@ class EvaluationResult {
 
 class ConceptMasterySummary {
   final int conceptId;
+  final int? lessonId;
   final String conceptName;
   final String domainCode;
   final MasteryLevel masteryLevel;
@@ -118,6 +122,7 @@ class ConceptMasterySummary {
 
   ConceptMasterySummary({
     required this.conceptId,
+    this.lessonId,
     required this.conceptName,
     required this.domainCode,
     required this.masteryLevel,
@@ -129,6 +134,7 @@ class ConceptMasterySummary {
   factory ConceptMasterySummary.fromJson(Map<String, dynamic> json) {
     return ConceptMasterySummary(
       conceptId: json['conceptId'] as int,
+      lessonId: json['lessonId'] as int?,
       conceptName: json['conceptName'] as String,
       domainCode: json['domainCode'] as String,
       masteryLevel: MasteryLevel.values.firstWhere(

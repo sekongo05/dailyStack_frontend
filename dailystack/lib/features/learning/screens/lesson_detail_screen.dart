@@ -251,6 +251,35 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     };
   }
 
+  String _cleanSectionMarkdown(String raw) {
+    if (raw.isEmpty) return raw;
+    final lines = raw.split('\n');
+    final buffer = StringBuffer();
+    var inFence = false;
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (line.trimLeft().startsWith('```')) {
+        inFence = !inFence;
+        buffer.write(line);
+      } else if (inFence) {
+        buffer.write(line);
+      } else {
+        buffer.write(
+          line
+              .replaceAll(r'\r\n', '\n')
+              .replaceAll(r'\n', '\n')
+              .replaceAll(r'\t', '  ')
+              .replaceAll(r'\"', '"')
+              .replaceAll(r'\times', '×')
+              .replaceAll(r'\le', '≤')
+              .replaceAll(r'\ge', '≥'),
+        );
+      }
+      if (i < lines.length - 1) buffer.write('\n');
+    }
+    return buffer.toString();
+  }
+
   Widget _buildSectionBlock(
     BuildContext context,
     LessonSection section,
@@ -259,7 +288,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   ) {
     final (icon, color) = _sectionMeta(section.sectionType, domainAccent);
     final body = MarkdownBody(
-      data: section.contentMarkdown,
+      data: _cleanSectionMarkdown(section.contentMarkdown),
       selectable: true,
       styleSheet: mdStyle,
       builders: {

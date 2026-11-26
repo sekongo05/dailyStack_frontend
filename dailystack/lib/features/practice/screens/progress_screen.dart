@@ -218,7 +218,17 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
                                     indent: AppSpacing.md,
                                     endIndent: AppSpacing.md,
                                   ),
-                                _NotionRow(notion: summary.notions[i]),
+                                _NotionRow(
+                                  notion: summary.notions[i],
+                                  onTap: summary.notions[i].lessonId != null
+                                      ? () async {
+                                          await context.push(
+                                            '/lessons/${summary.notions[i].lessonId}/exercises',
+                                          );
+                                          _refresh();
+                                        }
+                                      : null,
+                                ),
                               ],
                             ],
                           ),
@@ -270,38 +280,52 @@ class _DomainProgressRow extends StatelessWidget {
 
 class _NotionRow extends StatelessWidget {
   final ConceptMasterySummary notion;
-  const _NotionRow({required this.notion});
+  final VoidCallback? onTap;
+  const _NotionRow({required this.notion, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final scorePct = (notion.scoreRatio * 100).round();
 
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              DomainBadge(domainCode: notion.domainCode),
-              const SizedBox(width: AppSpacing.xs + 2),
-              MasteryBadge(level: notion.masteryLevel),
-              const Spacer(),
-              Text(
-                '$scorePct%',
-                style: context.text.labelLarge,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      DomainBadge(domainCode: notion.domainCode),
+                      const SizedBox(width: AppSpacing.xs + 2),
+                      MasteryBadge(level: notion.masteryLevel),
+                      const Spacer(),
+                      Text(
+                        '$scorePct%',
+                        style: context.text.labelLarge,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(notion.conceptName, style: context.text.titleSmall),
+                  const SizedBox(height: AppSpacing.xs - 2),
+                  Text(
+                    '${notion.evaluationsCount} évaluation(s)'
+                    '${notion.nextReviewDate != null ? ' · Prochaine révision : ${notion.nextReviewDate}' : ''}',
+                    style: context.text.bodySmall,
+                  ),
+                ],
               ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: AppSpacing.sm),
+              Icon(Icons.chevron_right_rounded, color: context.palette.textMuted),
             ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(notion.conceptName, style: context.text.titleSmall),
-          const SizedBox(height: 2),
-          Text(
-            '${notion.evaluationsCount} évaluation(s)'
-            '${notion.nextReviewDate != null ? ' · Prochaine révision : ${notion.nextReviewDate}' : ''}',
-            style: context.text.bodySmall,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
