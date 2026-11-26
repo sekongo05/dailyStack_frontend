@@ -131,17 +131,30 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
                           children: [
                             Expanded(
                               child: FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.sm,
+                                  ),
+                                ),
                                 onPressed: () async {
                                   await context
                                       .push('/lessons/$lessonId/exercises');
                                   _refresh();
                                 },
                                 icon: const Icon(Icons.quiz_rounded, size: 18),
-                                label: const Text('Lancer le QCM'),
+                                label: const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text('Lancer le QCM', maxLines: 1),
+                                ),
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                ),
+                              ),
                               onPressed: () async {
                                 await context.push('/lessons/$lessonId');
                                 _refresh();

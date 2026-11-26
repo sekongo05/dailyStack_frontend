@@ -733,6 +733,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   }
 
   Widget _buildReadingModeSwitch(bool cardsMode) {
+    final isCompact = MediaQuery.sizeOf(context).width < 440;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -747,16 +748,29 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
             children: [
               Expanded(
                 child: SegmentedButton<String>(
-                  segments: const [
+                  showSelectedIcon: false,
+                  segments: [
                     ButtonSegment<String>(
                       value: 'cards',
-                      icon: Icon(Icons.view_carousel_outlined, size: 17),
-                      label: Text('Mode Cartes (Étapes)'),
+                      icon: const Icon(Icons.view_carousel_outlined, size: 17),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          isCompact ? 'Cartes' : 'Mode Cartes (Étapes)',
+                          maxLines: 1,
+                        ),
+                      ),
                     ),
                     ButtonSegment<String>(
                       value: 'scroll',
-                      icon: Icon(Icons.article_outlined, size: 17),
-                      label: Text('Mode Article'),
+                      icon: const Icon(Icons.article_outlined, size: 17),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          isCompact ? 'Article' : 'Mode Article',
+                          maxLines: 1,
+                        ),
+                      ),
                     ),
                   ],
                   selected: {cardsMode ? 'cards' : 'scroll'},
@@ -889,39 +903,66 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                 constraints: const BoxConstraints(maxWidth: 740),
                 child: Row(
                   children: [
-                    OutlinedButton(
-                      onPressed: isFirst
-                          ? null
-                          : () => _pageController.previousPage(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                              ),
-                      child: const Text('← Précédent'),
+                    Flexible(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                          ),
+                        ),
+                        onPressed: isFirst
+                            ? null
+                            : () => _pageController.previousPage(
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOutCubic,
+                                ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('← Précédent', maxLines: 1),
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: AppSpacing.sm),
                     const Spacer(),
                     if (!isLast)
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: domainAccent,
-                          foregroundColor: Colors.white,
+                      Flexible(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: domainAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                          ),
+                          onPressed: () => _pageController.nextPage(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                          ),
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Étape suivante →', maxLines: 1),
+                          ),
                         ),
-                        onPressed: () => _pageController.nextPage(
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeOutCubic,
-                        ),
-                        child: const Text('Étape suivante →'),
                       )
                     else
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: domainAccent,
-                          foregroundColor: Colors.white,
+                      Flexible(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: domainAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                          ),
+                          onPressed: () => context.push(
+                            '/lessons/${widget.lessonId}/exercises',
+                          ),
+                          icon: const Icon(Icons.quiz_rounded, size: 18),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Défis QCM →', maxLines: 1),
+                          ),
                         ),
-                        onPressed: () => context.push(
-                          '/lessons/${widget.lessonId}/exercises',
-                        ),
-                        icon: const Icon(Icons.quiz_rounded, size: 18),
-                        label: const Text('Défis QCM →'),
                       ),
                   ],
                 ),
@@ -1045,10 +1086,15 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   void _showTableOfContents(BuildContext context, bool cardsMode) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetCtx) {
         return SafeArea(
-          child: ListView.separated(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+            ),
+            child: ListView.separated(
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -1092,6 +1138,7 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                 },
               );
             },
+            ),
           ),
         );
       },
@@ -1134,12 +1181,14 @@ class _CalloutBox extends StatelessWidget {
             children: [
               Icon(icon, size: 17, color: color),
               const SizedBox(width: 6),
-              Text(
-                title.toUpperCase(),
-                style: context.text.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  style: context.text.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],
@@ -1184,12 +1233,14 @@ class _ArchitectureFlowCard extends StatelessWidget {
                 color: accentColor,
               ),
               const SizedBox(width: 6),
-              Text(
-                'FLUX D\'ARCHITECTURE',
-                style: context.text.labelSmall?.copyWith(
-                  color: accentColor,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
+              Expanded(
+                child: Text(
+                  'FLUX D\'ARCHITECTURE',
+                  style: context.text.labelSmall?.copyWith(
+                    color: accentColor,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             ],

@@ -595,11 +595,20 @@ class _NotionRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      DomainBadge(domainCode: notion.domainCode),
-                      const SizedBox(width: AppSpacing.xs + 2),
-                      MasteryBadge(level: notion.masteryLevel),
-                      const Spacer(),
+                      Expanded(
+                        child: Wrap(
+                          spacing: AppSpacing.xs + 2,
+                          runSpacing: AppSpacing.xs,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            DomainBadge(domainCode: notion.domainCode),
+                            MasteryBadge(level: notion.masteryLevel),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Text(
                         '$scorePct%',
                         style: context.text.labelLarge,

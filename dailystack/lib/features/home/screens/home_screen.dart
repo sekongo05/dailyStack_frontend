@@ -350,9 +350,10 @@ class _Greeting extends ConsumerWidget {
   }) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
             0,
@@ -471,19 +472,16 @@ class _Greeting extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Flexible(
-                          child: Text(
-                            _todayLabel(),
-                            style: context.text.bodySmall,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        Text(
+                          _todayLabel(),
+                          style: context.text.bodySmall,
                         ),
-                        if (isRefreshing) ...[
-                          const SizedBox(width: AppSpacing.sm),
-                          const _SyncingPill(),
-                        ],
+                        if (isRefreshing) const _SyncingPill(),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -703,20 +701,26 @@ class _TodayLessonHero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              _HeroPill(
-                icon: isCompleted
-                    ? Icons.check_circle_rounded
-                    : DomainBadge.iconFor(lesson.domainCode),
-                label: statusLabel,
-              ),
-              const Spacer(),
-              _HeroPill(
-                icon: Icons.schedule_rounded,
-                label: '${lesson.estimatedMinutes} min',
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _HeroPill(
+                  icon: isCompleted
+                      ? Icons.check_circle_rounded
+                      : DomainBadge.iconFor(lesson.domainCode),
+                  label: statusLabel,
+                ),
+                _HeroPill(
+                  icon: Icons.schedule_rounded,
+                  label: '${lesson.estimatedMinutes} min',
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(

@@ -261,20 +261,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   Text('Thème', style: context.text.titleSmall),
                                   const SizedBox(height: AppSpacing.sm),
                                   SegmentedButton<ThemePreference>(
+                                    showSelectedIcon: false,
                                     segments: const [
                                       ButtonSegment(
                                         value: ThemePreference.LIGHT,
-                                        label: Text('Clair'),
+                                        label: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text('Clair', maxLines: 1),
+                                        ),
                                         icon: Icon(Icons.light_mode_outlined),
                                       ),
                                       ButtonSegment(
                                         value: ThemePreference.DARK,
-                                        label: Text('Sombre'),
+                                        label: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text('Sombre', maxLines: 1),
+                                        ),
                                         icon: Icon(Icons.dark_mode_outlined),
                                       ),
                                       ButtonSegment(
                                         value: ThemePreference.SYSTEM,
-                                        label: Text('Système'),
+                                        label: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text('Système', maxLines: 1),
+                                        ),
                                         icon: Icon(
                                           Icons.settings_suggest_outlined,
                                         ),

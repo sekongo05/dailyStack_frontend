@@ -79,6 +79,10 @@ class _PwaInstallBannerState extends ConsumerState<PwaInstallBanner> {
             ),
             const SizedBox(width: AppSpacing.xs),
             TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(44, 44),
+              ),
               onPressed: () => showPwaInstallGuideSheet(context),
               child: const Text('Installer'),
             ),
@@ -157,16 +161,23 @@ class _PwaInstallGuideSheetState extends State<_PwaInstallGuideSheet> {
             ),
             const SizedBox(height: AppSpacing.lg),
             SegmentedButton<bool>(
+              showSelectedIcon: false,
               segments: const [
                 ButtonSegment<bool>(
                   value: true,
-                  icon: Icon(Icons.phone_iphone_rounded, size: 18),
-                  label: Text('iPhone / Safari'),
+                  icon: Icon(Icons.phone_iphone_rounded, size: 17),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('iPhone / Safari', maxLines: 1),
+                  ),
                 ),
                 ButtonSegment<bool>(
                   value: false,
-                  icon: Icon(Icons.android_rounded, size: 18),
-                  label: Text('Android / Chrome'),
+                  icon: Icon(Icons.android_rounded, size: 17),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Android / Chrome', maxLines: 1),
+                  ),
                 ),
               ],
               selected: {_showIos},

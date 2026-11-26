@@ -142,9 +142,13 @@ class TagPill extends StatelessWidget {
             Icon(icon, size: 14, color: fg, semanticLabel: label),
             const SizedBox(width: 5),
           ],
-          Text(
-            label,
-            style: context.text.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

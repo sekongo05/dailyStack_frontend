@@ -6,6 +6,7 @@ import 'package:dailystack/core/theme/app_theme.dart';
 import 'package:dailystack/core/widgets/domain_badge.dart';
 import 'package:dailystack/core/widgets/ide_code_block.dart';
 import 'package:dailystack/core/widgets/state_views.dart';
+import 'package:dailystack/core/widgets/ui.dart';
 import 'package:dailystack/features/auth/screens/forgot_password_screen.dart';
 import 'package:dailystack/features/auth/screens/login_screen.dart';
 import 'package:dailystack/features/auth/screens/register_screen.dart';
@@ -174,5 +175,89 @@ public void processOrder(Long id) {
       find.text('Pas sûr ? Tester mon niveau en 60s'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('UI renders cleanly without overflow at 320px and 1024px', (WidgetTester tester) async {
+    const viewports = [Size(320, 568), Size(375, 812), Size(1024, 768)];
+
+    for (final size in viewports) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: MediaQuery(
+              data: MediaQueryData(
+                size: size,
+                textScaler: const TextScaler.linear(1.2),
+              ),
+              child: const RegisterScreen(),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: size,
+              textScaler: const TextScaler.linear(1.2),
+            ),
+            child: const Scaffold(
+              body: SingleChildScrollView(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ScreenHeader(
+                      title: 'Tableau de bord',
+                      subtitle: 'Progression quotidienne Backend & DevOps',
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: StatTile(
+                            icon: Icons.local_fire_department_rounded,
+                            color: AppColors.streak,
+                            value: '365 j',
+                            label: 'Série active',
+                          ),
+                        ),
+                        SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: StatTile(
+                            icon: Icons.verified_rounded,
+                            color: AppColors.success,
+                            value: '142',
+                            label: 'Notions maîtrisées',
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                    TagPill(
+                      label: 'Architecture distribuée & Tolérance aux pannes avancée',
+                      color: AppColors.brand,
+                      icon: Icons.bolt_rounded,
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                    OfflineBanner(pendingSync: true),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    }
+
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
   });
 }

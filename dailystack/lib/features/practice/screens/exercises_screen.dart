@@ -491,9 +491,12 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> {
             ),
             if (!hasSubmitted && _selectedOrderIds.isNotEmpty)
               TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
                 onPressed: _resetOrder,
                 icon: const Icon(Icons.restart_alt_rounded, size: 17),
-                label: const Text('Réinitialiser l\'ordre'),
+                label: const Text('Réinitialiser'),
               ),
           ],
         ),
@@ -804,18 +807,24 @@ class _ConfidenceSelector extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: ChoiceChip(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                labelPadding: EdgeInsets.zero,
                 label: SizedBox(
                   width: double.infinity,
-                  child: Text(
-                    item.label,
-                    textAlign: TextAlign.center,
-                    style: context.text.labelSmall?.copyWith(
-                      color: selectedLevel == item.level
-                          ? item.color
-                          : context.palette.textMuted,
-                      fontWeight: selectedLevel == item.level
-                          ? FontWeight.w700
-                          : FontWeight.w500,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                      style: context.text.labelSmall?.copyWith(
+                        color: selectedLevel == item.level
+                            ? item.color
+                            : context.palette.textMuted,
+                        fontWeight: selectedLevel == item.level
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
@@ -863,10 +872,12 @@ class _OrderedSolutionCard extends StatelessWidget {
                 color: AppColors.success,
               ),
               const SizedBox(width: 6),
-              Text(
-                'Séquence exacte attendue (1 → ${correctOrderedIds.length})',
-                style: context.text.titleSmall?.copyWith(
-                  color: AppColors.success,
+              Expanded(
+                child: Text(
+                  'Séquence exacte attendue (1 → ${correctOrderedIds.length})',
+                  style: context.text.titleSmall?.copyWith(
+                    color: AppColors.success,
+                  ),
                 ),
               ),
             ],
@@ -1015,12 +1026,18 @@ class _FeedbackCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           const Divider(),
           const SizedBox(height: AppSpacing.sm + 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Maîtrise de la notion', style: context.text.bodySmall),
-              MasteryBadge(level: result.conceptMasteryLevel),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Maîtrise de la notion', style: context.text.bodySmall),
+                MasteryBadge(level: result.conceptMasteryLevel),
+              ],
+            ),
           ),
         ],
       ),
