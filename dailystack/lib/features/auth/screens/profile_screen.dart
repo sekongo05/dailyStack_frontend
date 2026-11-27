@@ -311,6 +311,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             ),
                             const SizedBox(height: AppSpacing.lg),
+                            SurfaceCard(
+                              onTap: () => context.push('/guide'),
+                              child: Row(
+                                children: [
+                                  const IconTile(
+                                    icon: Icons.help_outline_rounded,
+                                    color: AppColors.brand,
+                                    size: 40,
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Guide d’utilisation',
+                                          style: context.text.titleSmall,
+                                        ),
+                                        Text(
+                                          'Leçons, quiz, flamme, boucliers et classement expliqués.',
+                                          style: context.text.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: context.palette.textMuted,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
                             const SectionHeader(
                               title: 'Rappels & notifications',
                             ),

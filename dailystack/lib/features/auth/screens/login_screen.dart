@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
@@ -30,6 +31,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final localErrors = <String, String>{};
+    if (email.isEmpty || !email.contains('@')) {
+      localErrors['email'] = 'Saisissez une adresse e-mail valide.';
+    }
+    if (password.isEmpty) {
+      localErrors['password'] = 'Saisissez votre mot de passe.';
+    }
+    if (localErrors.isNotEmpty) {
+      setState(() {
+        _fieldErrors = localErrors;
+        _errorMessage = null;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -38,8 +56,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       final auth = await ref.read(authServiceProvider).login(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
+            email: email,
+            password: password,
           );
       ref.read(currentUserProvider.notifier).state = auth.user;
       applyUserPreferences(ref, auth.user.preferences);
@@ -64,45 +82,67 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthLayout(
-      badge: 'MICRO-LEARNING TECH',
+      badge: 'CONNEXION',
       title: 'Bon retour',
-      subtitle: 'Connectez-vous pour reprendre votre progression Backend & DevOps.',
+      subtitle:
+          'Reprenez votre séance quotidienne Backend & DevOps là où vous l’avez laissée.',
       children: [
         if (_errorMessage != null) ...[
           InlineError(message: _errorMessage!),
           const SizedBox(height: AppSpacing.md),
         ],
-        TextField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: 'Adresse e-mail',
-            prefixIcon: const Icon(Icons.mail_outline_rounded),
-            errorText: _fieldErrors?['email'] as String?,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _isLoading ? null : _submit(),
-          decoration: InputDecoration(
-            labelText: 'Mot de passe',
-            prefixIcon: const Icon(Icons.lock_outline_rounded),
-            suffixIcon: IconButton(
-              tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
-              onPressed: () => setState(
-                () => _obscurePassword = !_obscurePassword,
+        AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) {
+                  if (_fieldErrors?.containsKey('email') == true) {
+                    setState(() => _fieldErrors?.remove('email'));
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: 'Adresse e-mail',
+                  hintText: 'vous@exemple.com',
+                  prefixIcon: const Icon(LucideIcons.mail, size: 18),
+                  errorText: _fieldErrors?['email'] as String?,
+                ),
               ),
-              icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _isLoading ? null : _submit(),
+                onChanged: (_) {
+                  if (_fieldErrors?.containsKey('password') == true) {
+                    setState(() => _fieldErrors?.remove('password'));
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: 'Mot de passe',
+                  prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
+                    onPressed: () => setState(
+                      () => _obscurePassword = !_obscurePassword,
+                    ),
+                    icon: Icon(
+                      _obscurePassword
+                          ? LucideIcons.eye
+                          : LucideIcons.eyeOff,
+                      size: 18,
+                    ),
+                  ),
+                  errorText: _fieldErrors?['password'] as String?,
+                ),
               ),
-            ),
-            errorText: _fieldErrors?['password'] as String?,
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -116,18 +156,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: AppSpacing.sm),
         PrimaryButton(
           label: 'Se connecter',
+          icon: LucideIcons.arrowRight,
           isLoading: _isLoading,
           onPressed: _submit,
         ),
+        const SizedBox(height: AppSpacing.lg),
+        const Divider(),
         const SizedBox(height: AppSpacing.md),
         Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text('Pas encore de compte ?', style: context.text.bodySmall),
+            Text('Nouveau sur DailyStack ?', style: context.text.bodySmall),
             TextButton(
               onPressed: () => context.go('/register'),
-              child: const Text('S\'inscrire'),
+              child: const Text('Créer un compte'),
             ),
           ],
         ),

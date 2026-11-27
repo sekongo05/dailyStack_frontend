@@ -718,12 +718,17 @@ class _Greeting extends ConsumerWidget {
                 ),
               ),
               IconButton(
+                tooltip: 'Comment ça marche',
+                onPressed: () => context.push('/guide'),
+                icon: const Icon(LucideIcons.circleHelp, size: 21),
+              ),
+              IconButton(
                 tooltip: 'Notifications',
                 onPressed: onNotificationsTap,
                 icon: Badge(
                   isLabelVisible: unread > 0,
                   label: Text('$unread'),
-                  child: const Icon(Icons.notifications_none_rounded, size: 26),
+                  child: const Icon(LucideIcons.bell, size: 22),
                 ),
               ),
             ],

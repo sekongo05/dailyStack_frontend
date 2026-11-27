@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
@@ -32,6 +33,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _submit() async {
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final localErrors = <String, String>{};
+    if (username.length < 3) {
+      localErrors['username'] = 'Minimum 3 caractères.';
+    }
+    if (email.isEmpty || !email.contains('@')) {
+      localErrors['email'] = 'Saisissez une adresse e-mail valide.';
+    }
+    if (password.length < 8) {
+      localErrors['password'] = 'Minimum 8 caractères requis.';
+    }
+    if (localErrors.isNotEmpty) {
+      setState(() {
+        _fieldErrors = localErrors;
+        _errorMessage = null;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -40,9 +62,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     try {
       final auth = await ref.read(authServiceProvider).register(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-            username: _usernameController.text.trim(),
+            email: email,
+            password: password,
+            username: username,
             initialLevel: 1,
           );
       ref.read(currentUserProvider.notifier).state = auth.user;
@@ -67,64 +89,112 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pwd = _passwordController.text;
+    final hasMinLen = pwd.length >= 8;
+    final hasUpperOrDigit =
+        pwd.contains(RegExp(r'[A-Z]')) && pwd.contains(RegExp(r'[0-9]'));
+
     return AuthLayout(
-      badge: 'NOUVEAU COMPTE',
+      badge: 'INSCRIPTION',
       title: 'Créer un compte',
       subtitle:
-          'Commencez votre progression Backend & DevOps dès aujourd\'hui.',
+          '5 minutes par jour pour progresser en Backend & DevOps du Niveau 1 à 5.',
       leadingAction: IconButton(
         tooltip: 'Retour',
         onPressed: () => context.go('/login'),
-        icon: const Icon(Icons.arrow_back_rounded),
+        icon: const Icon(LucideIcons.arrowLeft, size: 20),
       ),
       children: [
         if (_errorMessage != null) ...[
           InlineError(message: _errorMessage!),
           const SizedBox(height: AppSpacing.md),
         ],
-        TextField(
-          controller: _usernameController,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: 'Nom d\'utilisateur',
-            prefixIcon: const Icon(Icons.person_outline_rounded),
-            errorText: _fieldErrors?['username'] as String?,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        TextField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: 'Adresse e-mail',
-            prefixIcon: const Icon(Icons.mail_outline_rounded),
-            errorText: _fieldErrors?['email'] as String?,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _isLoading ? null : _submit(),
-          decoration: InputDecoration(
-            labelText: 'Mot de passe',
-            prefixIcon: const Icon(Icons.lock_outline_rounded),
-            suffixIcon: IconButton(
-              tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
-              onPressed: () => setState(
-                () => _obscurePassword = !_obscurePassword,
+        AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _usernameController,
+                autofillHints: const [AutofillHints.username],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) {
+                  if (_fieldErrors?.containsKey('username') == true) {
+                    setState(() => _fieldErrors?.remove('username'));
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: 'Nom d’utilisateur',
+                  hintText: 'Ex. MoussaDev',
+                  prefixIcon: const Icon(LucideIcons.user, size: 18),
+                  errorText: _fieldErrors?['username'] as String?,
+                ),
               ),
-              icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) {
+                  if (_fieldErrors?.containsKey('email') == true) {
+                    setState(() => _fieldErrors?.remove('email'));
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: 'Adresse e-mail',
+                  hintText: 'vous@exemple.com',
+                  prefixIcon: const Icon(LucideIcons.mail, size: 18),
+                  errorText: _fieldErrors?['email'] as String?,
+                ),
               ),
-            ),
-            errorText: _fieldErrors?['password'] as String?,
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _isLoading ? null : _submit(),
+                onChanged: (_) => setState(() {
+                  _fieldErrors?.remove('password');
+                }),
+                decoration: InputDecoration(
+                  labelText: 'Mot de passe',
+                  prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
+                    onPressed: () => setState(
+                      () => _obscurePassword = !_obscurePassword,
+                    ),
+                    icon: Icon(
+                      _obscurePassword
+                          ? LucideIcons.eye
+                          : LucideIcons.eyeOff,
+                      size: 18,
+                    ),
+                  ),
+                  errorText: _fieldErrors?['password'] as String?,
+                ),
+              ),
+            ],
           ),
         ),
+        if (pwd.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: 4,
+            children: [
+              _PasswordRuleCheck(
+                label: '8+ caractères',
+                ok: hasMinLen,
+              ),
+              _PasswordRuleCheck(
+                label: '1 majuscule & 1 chiffre',
+                ok: hasUpperOrDigit,
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         Container(
           padding: const EdgeInsets.symmetric(
@@ -139,7 +209,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           child: Row(
             children: [
               const Icon(
-                Icons.workspace_premium_outlined,
+                LucideIcons.award,
                 size: 18,
                 color: AppColors.brand,
               ),
@@ -155,10 +225,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         const SizedBox(height: AppSpacing.md),
         PrimaryButton(
-          label: 'S\'inscrire',
+          label: 'Créer mon compte',
+          icon: LucideIcons.arrowRight,
           isLoading: _isLoading,
           onPressed: _submit,
         ),
+        const SizedBox(height: AppSpacing.lg),
+        const Divider(),
         const SizedBox(height: AppSpacing.md),
         Wrap(
           alignment: WrapAlignment.center,
@@ -170,6 +243,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               child: const Text('Se connecter'),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PasswordRuleCheck extends StatelessWidget {
+  final String label;
+  final bool ok;
+
+  const _PasswordRuleCheck({required this.label, required this.ok});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ok ? AppColors.success : context.palette.textMuted;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          ok ? LucideIcons.check : LucideIcons.circle,
+          size: 13,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: context.text.bodySmall?.copyWith(fontSize: 12, color: color),
         ),
       ],
     );
