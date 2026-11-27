@@ -31,6 +31,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notifyImportantNews = true;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isSendingTestPush = false;
   bool _hasUnsavedChanges = false;
   String? _error;
 
@@ -479,6 +480,103 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                           SnackBar(content: Text(feedback)),
                                         );
                                       },
+                                    ),
+                                    const Divider(
+                                      height: 1,
+                                      indent: AppSpacing.md,
+                                      endIndent: AppSpacing.md,
+                                    ),
+                                    ListTile(
+                                      leading: const IconTile(
+                                        icon: Icons.send_rounded,
+                                        color: AppColors.brand,
+                                        size: 38,
+                                      ),
+                                      title: const Text(
+                                        'Envoyer une notification de test',
+                                      ),
+                                      subtitle: const Text(
+                                        'Vérifier la réception sur votre téléphone',
+                                      ),
+                                      trailing: _isSendingTestPush
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : Icon(
+                                              Icons.chevron_right_rounded,
+                                              color:
+                                                  context.palette.textMuted,
+                                            ),
+                                      onTap: _isSendingTestPush
+                                          ? null
+                                          : () async {
+                                              final messenger =
+                                                  ScaffoldMessenger.of(context);
+                                              final notifService = ref.read(
+                                                notificationServiceProvider,
+                                              );
+                                              setState(() =>
+                                                  _isSendingTestPush = true);
+                                              try {
+                                                if (webNotificationPermission !=
+                                                    'granted') {
+                                                  final perm =
+                                                      await requestWebNotificationPermission();
+                                                  if (perm != 'granted') {
+                                                    if (!mounted) return;
+                                                    messenger.showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Autorisez d\'abord les notifications sur cet appareil.',
+                                                        ),
+                                                      ),
+                                                    );
+                                                    return;
+                                                  }
+                                                }
+                                                final token =
+                                                    await fetchWebFcmToken(
+                                                  promptIfNeeded: false,
+                                                );
+                                                if (token != null) {
+                                                  await notifService
+                                                      .registerDeviceToken(
+                                                    token,
+                                                    platform: 'web',
+                                                  );
+                                                }
+                                                final resultMessage =
+                                                    await notifService
+                                                        .sendTestPush();
+                                                if (!mounted) return;
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content:
+                                                        Text(resultMessage),
+                                                  ),
+                                                );
+                                              } catch (e) {
+                                                if (!mounted) return;
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Impossible d\'envoyer le test : $e',
+                                                    ),
+                                                  ),
+                                                );
+                                              } finally {
+                                                if (mounted) {
+                                                  setState(() =>
+                                                      _isSendingTestPush =
+                                                          false);
+                                                }
+                                              }
+                                            },
                                     ),
                                   ],
                                 ],

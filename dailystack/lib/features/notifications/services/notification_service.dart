@@ -61,4 +61,24 @@ class NotificationService {
       throw DioClient.mapError(e);
     }
   }
+
+  /// Demande au backend d'envoyer une notification push de test immédiate.
+  Future<String> sendTestPush() async {
+    try {
+      final response = await _client.dio.post('/notifications/test-push');
+      final raw = response.data;
+      if (raw is Map<String, dynamic>) {
+        final data = raw['data'];
+        if (data is Map<String, dynamic>) {
+          final msg = data['message']?.toString();
+          if (msg != null && msg.trim().isNotEmpty) {
+            return msg.trim();
+          }
+        }
+      }
+      return 'Test de notification envoyé.';
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
 }
