@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,17 +18,28 @@ class WatchScreen extends ConsumerStatefulWidget {
 }
 
 class _WatchScreenState extends ConsumerState<WatchScreen> {
+  static const String _readNewsStorageKey = 'read_news_ids_v1';
+  static const int _pageSize = 15;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   WatchCategory? _selectedCategory;
   bool _onlyBookmarks = false;
+  bool _onlyImportant = false;
   List<TechNewsSummary> _items = [];
+  Set<int> _readNewsIds = {};
+  int _currentPage = 0;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
+    _loadReadNewsIds();
     _loadNews();
   }
 
@@ -35,12 +47,57 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients ||
+        _isLoading ||
+        _isLoadingMore ||
+        !_hasMore ||
+        _onlyBookmarks) {
+      return;
+    }
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 250) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadReadNewsIds() async {
+    try {
+      final raw =
+          await ref.read(localDatabaseProvider).getMetadata(_readNewsStorageKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _readNewsIds = decoded.map((e) => (e as num).toInt()).toSet();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _markAsRead(int newsId) async {
+    if (_readNewsIds.contains(newsId)) return;
+    final updated = {..._readNewsIds, newsId};
+    if (mounted) {
+      setState(() => _readNewsIds = updated);
+    }
+    try {
+      final capped = updated.toList();
+      final toSave =
+          capped.length > 500 ? capped.sublist(capped.length - 500) : capped;
+      await ref
+          .read(localDatabaseProvider)
+          .setMetadata(_readNewsStorageKey, jsonEncode(toSave));
+    } catch (_) {}
   }
 
   Future<void> _loadNews() async {
     final localDb = ref.read(localDatabaseProvider);
     final isDefaultFeed = !_onlyBookmarks &&
+        !_onlyImportant &&
         _selectedCategory == null &&
         _searchController.text.trim().isEmpty;
 
@@ -66,19 +123,34 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     try {
       final newsService = ref.read(newsServiceProvider);
-      final list = _onlyBookmarks
-          ? await newsService.getBookmarks(size: 30)
-          : await newsService.getNews(
-              category: _selectedCategory,
-              keyword: _searchController.text.trim(),
-              size: 30,
-            );
+      if (_onlyBookmarks) {
+        final list = await newsService.getBookmarks(size: 30);
+        if (!mounted) return;
+        setState(() {
+          _items = list;
+          _currentPage = 0;
+          _hasMore = false;
+          _isLoading = false;
+          _error = null;
+        });
+        return;
+      }
+
+      final page = await newsService.getNewsPage(
+        category: _selectedCategory,
+        keyword: _searchController.text.trim(),
+        importantOnly: _onlyImportant,
+        page: 0,
+        size: _pageSize,
+      );
       if (isDefaultFeed) {
-        await localDb.cacheNews(list);
+        await localDb.cacheNews(page.items);
       }
       if (!mounted) return;
       setState(() {
-        _items = list;
+        _items = page.items;
+        _currentPage = 0;
+        _hasMore = page.hasMore;
         _isLoading = false;
         _error = null;
       });
@@ -88,6 +160,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         final query = _searchController.text.trim().toLowerCase();
         final filtered = cached.where((item) {
           if (_onlyBookmarks && !item.bookmarked) return false;
+          if (_onlyImportant &&
+              item.importance != WatchImportance.HIGH &&
+              item.importance != WatchImportance.CRITICAL) {
+            return false;
+          }
           if (!_onlyBookmarks &&
               _selectedCategory != null &&
               item.category != _selectedCategory) {
@@ -105,6 +182,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         if (!mounted) return;
         setState(() {
           _items = filtered;
+          _hasMore = false;
           _isLoading = false;
           _error = null;
         });
@@ -115,6 +193,34 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore || _onlyBookmarks) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final nextPage = _currentPage + 1;
+      final page = await ref.read(newsServiceProvider).getNewsPage(
+            category: _selectedCategory,
+            keyword: _searchController.text.trim(),
+            importantOnly: _onlyImportant,
+            page: nextPage,
+            size: _pageSize,
+          );
+      if (!mounted) return;
+      final existingIds = _items.map((e) => e.id).toSet();
+      final newItems =
+          page.items.where((e) => !existingIds.contains(e.id)).toList();
+      setState(() {
+        _items = [..._items, ...newItems];
+        _currentPage = nextPage;
+        _hasMore = page.hasMore;
+        _isLoadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingMore = false);
     }
   }
 
@@ -145,6 +251,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     _searchController.clear();
     setState(() {
       _onlyBookmarks = false;
+      _onlyImportant = false;
       _selectedCategory = null;
     });
     _loadNews();
@@ -153,6 +260,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   @override
   Widget build(BuildContext context) {
     final hasActiveFilters = _onlyBookmarks ||
+        _onlyImportant ||
         _selectedCategory != null ||
         _searchController.text.trim().isNotEmpty;
 
@@ -226,22 +334,44 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         : RefreshIndicator(
                             onRefresh: _loadNews,
                             child: ListView.separated(
+                              controller: _scrollController,
                               padding: const EdgeInsets.fromLTRB(
                                 AppSpacing.md,
                                 AppSpacing.xs,
                                 AppSpacing.md,
                                 AppSpacing.xl,
                               ),
-                              itemCount: _items.length,
+                              itemCount: _items.length + (_isLoadingMore ? 1 : 0),
                               separatorBuilder: (_, _) =>
                                   const SizedBox(height: AppSpacing.md),
                               itemBuilder: (context, index) {
+                                if (index >= _items.length) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: AppSpacing.md,
+                                    ),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
                                 final item = _items[index];
+                                final isRead = _readNewsIds.contains(item.id);
                                 return _NewsCard(
                                   item: item,
+                                  isRead: isRead,
                                   onBookmarkTap: () => _toggleBookmark(index),
                                   onTap: () async {
+                                    await _markAsRead(item.id);
+                                    if (!context.mounted) return;
                                     await context.push('/watch/${item.id}');
+                                    await _loadReadNewsIds();
                                     _loadNews();
                                   },
                                 );
@@ -275,17 +405,39 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
             label: const Text('Favoris'),
             selected: _onlyBookmarks,
             onSelected: (val) {
-              setState(() => _onlyBookmarks = val);
+              setState(() {
+                _onlyBookmarks = val;
+                if (val) _onlyImportant = false;
+              });
+              _loadNews();
+            },
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          FilterChip(
+            avatar: Icon(
+              Icons.bolt_rounded,
+              size: 16,
+              color: _onlyImportant ? AppColors.warning : null,
+            ),
+            label: const Text('Importantes'),
+            selected: !_onlyBookmarks && _onlyImportant,
+            onSelected: (val) {
+              setState(() {
+                _onlyBookmarks = false;
+                _onlyImportant = val;
+              });
               _loadNews();
             },
           ),
           const SizedBox(width: AppSpacing.sm),
           FilterChip(
             label: const Text('Toutes'),
-            selected: !_onlyBookmarks && _selectedCategory == null,
+            selected:
+                !_onlyBookmarks && !_onlyImportant && _selectedCategory == null,
             onSelected: (_) {
               setState(() {
                 _onlyBookmarks = false;
+                _onlyImportant = false;
                 _selectedCategory = null;
               });
               _loadNews();
@@ -314,11 +466,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
 class _NewsCard extends StatelessWidget {
   final TechNewsSummary item;
+  final bool isRead;
   final VoidCallback onTap;
   final VoidCallback onBookmarkTap;
 
   const _NewsCard({
     required this.item,
+    required this.isRead,
     required this.onTap,
     required this.onBookmarkTap,
   });
@@ -331,21 +485,33 @@ class _NewsCard extends StatelessWidget {
 
     return SurfaceCard(
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
-                  children: [
-                    WatchCategoryPill(category: item.category),
-                    WatchImportancePill(importance: item.importance),
-                  ],
+      child: Opacity(
+        opacity: isRead ? 0.78 : 1.0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (!isRead)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.brand,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      WatchCategoryPill(category: item.category),
+                      WatchImportancePill(importance: item.importance),
+                    ],
+                  ),
                 ),
-              ),
               IconButton(
                 constraints: const BoxConstraints(
                   minWidth: 44,
@@ -425,6 +591,7 @@ class _NewsCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }

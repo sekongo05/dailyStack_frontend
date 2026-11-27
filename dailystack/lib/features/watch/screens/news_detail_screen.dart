@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,6 +32,24 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
     _load();
   }
 
+  Future<void> _markAsRead() async {
+    try {
+      final db = ref.read(localDatabaseProvider);
+      final raw = await db.getMetadata('read_news_ids_v1');
+      final ids = raw != null && raw.isNotEmpty
+          ? (jsonDecode(raw) as List<dynamic>)
+              .map((e) => (e as num).toInt())
+              .toSet()
+          : <int>{};
+      if (ids.add(widget.newsId)) {
+        final list = ids.toList();
+        final toSave =
+            list.length > 500 ? list.sublist(list.length - 500) : list;
+        await db.setMetadata('read_news_ids_v1', jsonEncode(toSave));
+      }
+    } catch (_) {}
+  }
+
   Future<void> _load() async {
     setState(() {
       _isLoading = true;
@@ -39,6 +58,7 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
     try {
       final data =
           await ref.read(newsServiceProvider).getNewsDetail(widget.newsId);
+      await _markAsRead();
       if (!mounted) return;
       setState(() {
         _detail = data;
@@ -78,6 +98,30 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
     }
   }
 
+  Future<void> _shareArticle(TechNewsDetail detail) async {
+    final buffer = StringBuffer()
+      ..writeln('${detail.title} (${detail.targetTechnology})')
+      ..writeln()
+      ..writeln(detail.summary);
+    if (detail.developerImpact != null && detail.developerImpact!.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln('Impact : ${detail.developerImpact}');
+    }
+    if (detail.originalSourceUrl.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln('Source : ${detail.originalSourceUrl}');
+    }
+    await Clipboard.setData(ClipboardData(text: buffer.toString().trim()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Résumé et lien copiés pour partage.'),
+      ),
+    );
+  }
+
   Future<void> _toggleBookmark() async {
     if (_detail == null) return;
     try {
@@ -107,7 +151,13 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
       appBar: AppBar(
         title: const Text('Veille'),
         actions: [
-          if (detail != null)
+          if (detail != null) ...[
+            IconButton(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              onPressed: () => _shareArticle(detail),
+              tooltip: 'Partager',
+              icon: const Icon(Icons.share_outlined),
+            ),
             IconButton(
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               onPressed: _toggleBookmark,
@@ -121,6 +171,7 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
                 color: detail.bookmarked ? AppColors.brand : null,
               ),
             ),
+          ],
         ],
       ),
       body: _isLoading

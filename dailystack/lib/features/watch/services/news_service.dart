@@ -3,16 +3,24 @@ import '../../../core/network/api_response.dart';
 import '../../../core/network/dio_client.dart';
 import '../models/news_models.dart';
 
+class TechNewsPage {
+  final List<TechNewsSummary> items;
+  final bool hasMore;
+
+  const TechNewsPage({required this.items, required this.hasMore});
+}
+
 class NewsService {
   final DioClient _client;
 
   NewsService(this._client);
 
-  Future<List<TechNewsSummary>> getNews({
+  Future<TechNewsPage> getNewsPage({
     WatchCategory? category,
     String? keyword,
+    bool importantOnly = false,
     int page = 0,
-    int size = 10,
+    int size = 15,
   }) async {
     try {
       final response = await _client.dio.get(
@@ -20,6 +28,7 @@ class NewsService {
         queryParameters: {
           if (category != null) 'category': category.name,
           if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
+          if (importantOnly) 'importantOnly': true,
           'page': page,
           'size': size,
         },
@@ -27,14 +36,38 @@ class NewsService {
       final apiRes = ApiResponse.fromJson(
         response.data as Map<String, dynamic>,
         (data) {
-          final content = (data as Map<String, dynamic>)['content'] as List<dynamic>? ?? [];
-          return content.map((e) => TechNewsSummary.fromJson(e as Map<String, dynamic>)).toList();
+          final map = data as Map<String, dynamic>;
+          final content = map['content'] as List<dynamic>? ?? [];
+          final isLast = map['last'] as bool? ?? true;
+          return TechNewsPage(
+            items: content
+                .map((e) => TechNewsSummary.fromJson(e as Map<String, dynamic>))
+                .toList(),
+            hasMore: !isLast,
+          );
         },
       );
-      return apiRes.data ?? [];
+      return apiRes.data ?? const TechNewsPage(items: [], hasMore: false);
     } on DioException catch (e) {
       throw DioClient.mapError(e);
     }
+  }
+
+  Future<List<TechNewsSummary>> getNews({
+    WatchCategory? category,
+    String? keyword,
+    bool importantOnly = false,
+    int page = 0,
+    int size = 10,
+  }) async {
+    final result = await getNewsPage(
+      category: category,
+      keyword: keyword,
+      importantOnly: importantOnly,
+      page: page,
+      size: size,
+    );
+    return result.items;
   }
 
   Future<TechNewsDetail> getNewsDetail(int id) async {
