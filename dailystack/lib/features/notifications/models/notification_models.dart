@@ -1,6 +1,7 @@
 class DailyNotificationItem {
   final int id;
   final int lessonId;
+  final String? targetRoute;
   final String title;
   final String message;
   final String sentDate;
@@ -10,6 +11,7 @@ class DailyNotificationItem {
   DailyNotificationItem({
     required this.id,
     required this.lessonId,
+    this.targetRoute,
     required this.title,
     required this.message,
     required this.sentDate,
@@ -20,7 +22,8 @@ class DailyNotificationItem {
   factory DailyNotificationItem.fromJson(Map<String, dynamic> json) {
     return DailyNotificationItem(
       id: json['id'] as int,
-      lessonId: json['lessonId'] as int,
+      lessonId: json['lessonId'] as int? ?? 0,
+      targetRoute: json['targetRoute'] as String?,
       title: json['title'] as String? ?? '',
       message: json['message'] as String? ?? '',
       sentDate: json['sentDate'] as String? ?? '',

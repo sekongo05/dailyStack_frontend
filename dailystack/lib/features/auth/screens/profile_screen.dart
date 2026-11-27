@@ -9,10 +9,10 @@ import '../../../core/widgets/pwa_install_sheet.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
 import '../../home/screens/home_screen.dart';
+import '../../learning/models/lesson_models.dart';
 import '../../learning/screens/tracks_screen.dart';
 import '../../practice/screens/progress_screen.dart';
 import '../models/auth_models.dart';
-import '../widgets/level_placement_quiz_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -25,7 +25,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   UserProfile? _profile;
   ThemePreference _theme = ThemePreference.SYSTEM;
   TextSizePreference _textSize = TextSizePreference.MEDIUM;
-  int _currentLevel = 1;
   String _reminderTime = '06:00:00';
   bool _notifyDailyLesson = true;
   bool _notifyReviews = true;
@@ -56,7 +55,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _profile = profile;
         _theme = prefs.theme;
         _textSize = prefs.textSize;
-        _currentLevel = profile.currentLevel;
         _reminderTime = prefs.dailyReminderTime;
         _notifyDailyLesson = prefs.notifyDailyLesson;
         _notifyReviews = prefs.notifyReviews;
@@ -73,30 +71,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  Future<void> _openPlacementQuiz() async {
-    final recommended = await showLevelPlacementQuizSheet(context);
-    if (recommended != null && mounted) {
-      setState(() {
-        _currentLevel = recommended;
-        _hasUnsavedChanges = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Niveau $recommended sélectionné. Appuyez sur « Enregistrer » pour confirmer.',
-          ),
-        ),
-      );
-    }
-  }
-
   Future<void> _savePreferences() async {
     setState(() => _isSaving = true);
     try {
       final updated = await ref.read(authServiceProvider).updatePreferences({
         'theme': _theme.name,
         'textSize': _textSize.name,
-        'currentLevel': _currentLevel,
         'dailyReminderTime': _reminderTime,
         'notifyDailyLesson': _notifyDailyLesson,
         'notifyReviews': _notifyReviews,
@@ -187,59 +167,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Text(
-                                    'Niveau actuel (alternance quotidienne Backend / DevOps)',
-                                    style: context.text.titleSmall,
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  DropdownButtonFormField<int>(
-                                    key: ValueKey<int>(_currentLevel),
-                                    initialValue: _currentLevel,
-                                    isExpanded: true,
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 1,
-                                        child: Text('Niveau 1 — Amateur'),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Niveau actuel',
+                                          style: context.text.titleSmall,
+                                        ),
                                       ),
-                                      DropdownMenuItem(
-                                        value: 2,
-                                        child: Text('Niveau 2 — Débutant'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 3,
-                                        child: Text('Niveau 3 — Junior'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 4,
-                                        child: Text('Niveau 4 — Senior'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 5,
-                                        child: Text('Niveau 5 — Expert'),
+                                      TagPill(
+                                        label:
+                                            'Niveau ${_profile?.currentLevel ?? 1} — ${DailyLessonSummary.levelLabel(_profile?.currentLevel ?? 1)}',
+                                        color: AppColors.brand,
                                       ),
                                     ],
-                                    onChanged: (val) {
-                                      if (val != null) {
-                                        setState(() {
-                                          _currentLevel = val;
-                                          _hasUnsavedChanges = true;
-                                        });
-                                      }
-                                    },
                                   ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: TextButton.icon(
-                                      onPressed: _openPlacementQuiz,
-                                      icon: const Icon(
-                                        Icons.psychology_alt_rounded,
-                                        size: 18,
-                                      ),
-                                      label: const Text(
-                                        'Pas sûr ? Tester mon niveau en 60s',
-                                      ),
-                                    ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    'Votre niveau progresse automatiquement lorsque vous terminez les leçons et quiz de votre palier actuel.',
+                                    style: context.text.bodySmall,
                                   ),
                                 ],
                               ),

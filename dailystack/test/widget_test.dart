@@ -161,7 +161,7 @@ public void processOrder(Long id) {
     );
   });
 
-  testWidgets('RegisterScreen displays 60s placement quiz CTA', (WidgetTester tester) async {
+  testWidgets('RegisterScreen displays locked level 1 starting notice', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
@@ -172,8 +172,12 @@ public void processOrder(Long id) {
     );
 
     expect(
-      find.text('Pas sûr ? Tester mon niveau en 60s'),
+      find.textContaining('Départ au Niveau 1 (Amateur)'),
       findsOneWidget,
+    );
+    expect(
+      find.text('Pas sûr ? Tester mon niveau en 60s'),
+      findsNothing,
     );
   });
 

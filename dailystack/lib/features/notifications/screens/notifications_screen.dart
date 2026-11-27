@@ -102,7 +102,21 @@ class NotificationsScreen extends ConsumerWidget {
                       } catch (_) {}
                     }
                     if (context.mounted) {
-                      if (item.lessonId > 0) {
+                      final route = item.targetRoute?.trim();
+                      if (route != null && route.startsWith('/')) {
+                        const rootTabs = {
+                          '/home',
+                          '/learning',
+                          '/watch',
+                          '/progress',
+                          '/profile',
+                        };
+                        if (rootTabs.contains(route)) {
+                          context.go(route);
+                        } else {
+                          await context.push(route);
+                        }
+                      } else if (item.lessonId > 0) {
                         await context.push('/lessons/${item.lessonId}');
                       } else {
                         context.go('/watch');
