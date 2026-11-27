@@ -39,6 +39,14 @@ class NotificationService {
     }
   }
 
+  Future<void> markAllAsRead() async {
+    try {
+      await _client.dio.post('/notifications/read-all');
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
+
   /// Enregistre le token push FCM (Web ou Mobile) auprès du backend.
   Future<void> registerDeviceToken(
     String token, {

@@ -22,13 +22,17 @@ class NotificationsScreen extends ConsumerWidget {
   ) async {
     if (unread.isEmpty) return;
     final service = ref.read(notificationServiceProvider);
-    await Future.wait(
-      unread.map((item) async {
-        try {
-          await service.markAsRead(item.id);
-        } catch (_) {}
-      }),
-    );
+    try {
+      await service.markAllAsRead();
+    } catch (_) {
+      await Future.wait(
+        unread.map((item) async {
+          try {
+            await service.markAsRead(item.id);
+          } catch (_) {}
+        }),
+      );
+    }
     ref.invalidate(notificationsListProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

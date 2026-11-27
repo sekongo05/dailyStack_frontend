@@ -15,12 +15,15 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const notif = payload.notification || {};
+  const data = payload.data || {};
   const title = notif.title || 'DailyStack';
   const options = {
     body: notif.body || 'Votre séance du jour est prête.',
     icon: '/icons/Icon-192.png',
     badge: '/icons/Icon-192.png',
-    data: payload.data || {}
+    tag: data.tag || 'dailystack-general',
+    renotify: true,
+    data: data
   };
   return self.registration.showNotification(title, options);
 });
@@ -30,33 +33,39 @@ function resolveTargetUrl(notification) {
   const fcmData = (data.FCM_MSG && data.FCM_MSG.data) || {};
   const rawRoute = data.targetRoute || fcmData.targetRoute || '';
   const route = typeof rawRoute === 'string' ? rawRoute.trim() : '';
-  if (!route || !route.startsWith('/')) {
-    return '/';
-  }
-  return '/#' + route;
+  const rawNotifId = data.notificationId || fcmData.notificationId || '';
+  const notifId = typeof rawNotifId === 'string' ? rawNotifId.trim() : String(rawNotifId || '');
+  const basePath = (!route || !route.startsWith('/')) ? '/home' : route;
+  const query = notifId ? '?notifId=' + encodeURIComponent(notifId) : '';
+  return '/#' + basePath + query;
 }
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = resolveTargetUrl(event.notification);
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ('navigate' in client && targetUrl !== '/') {
-          return client.navigate(targetUrl).then((navigated) => {
-            if (navigated && 'focus' in navigated) {
-              return navigated.focus();
-            }
-            return 'focus' in client ? client.focus() : undefined;
-          });
+    Promise.all([
+      self.registration.getNotifications
+        ? self.registration.getNotifications().then((list) => list.forEach((n) => n.close()))
+        : Promise.resolve(),
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if ('navigate' in client) {
+            return client.navigate(targetUrl).then((navigated) => {
+              if (navigated && 'focus' in navigated) {
+                return navigated.focus();
+              }
+              return 'focus' in client ? client.focus() : undefined;
+            });
+          }
+          if ('focus' in client) {
+            return client.focus();
+          }
         }
-        if ('focus' in client) {
-          return client.focus();
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
-    })
+      })
+    ])
   );
 });
