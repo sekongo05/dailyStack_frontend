@@ -77,4 +77,23 @@ class PracticeService {
       throw DioClient.mapError(e);
     }
   }
+
+  Future<LeaderboardData> getLeaderboard({
+    String period = 'WEEKLY',
+    int limit = 30,
+  }) async {
+    try {
+      final response = await _client.dio.get(
+        '/progress/leaderboard',
+        queryParameters: {'period': period, 'limit': limit},
+      );
+      final apiRes = ApiResponse.fromJson(
+        response.data as Map<String, dynamic>,
+        (data) => LeaderboardData.fromJson(data as Map<String, dynamic>),
+      );
+      return apiRes.data!;
+    } on DioException catch (e) {
+      throw DioClient.mapError(e);
+    }
+  }
 }

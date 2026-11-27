@@ -15,6 +15,7 @@ import '../../features/home/screens/home_screen.dart';
 import '../../features/learning/screens/lesson_detail_screen.dart';
 import '../../features/learning/screens/tracks_screen.dart';
 import '../../features/practice/screens/exercises_screen.dart';
+import '../../features/practice/screens/leaderboard_screen.dart';
 import '../../features/practice/screens/progress_screen.dart';
 import '../../features/practice/screens/reviews_screen.dart';
 import '../../features/watch/screens/news_detail_screen.dart';
@@ -70,6 +71,10 @@ class AppRouter {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/leaderboard',
+        builder: (context, state) => const LeaderboardScreen(),
       ),
       GoRoute(
         path: '/watch/:id',

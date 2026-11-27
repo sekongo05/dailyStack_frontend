@@ -329,3 +329,64 @@ class ProgressSummary {
         'activityCalendar': activityCalendar.map((a) => a.toJson()).toList(),
       };
 }
+
+class LeaderboardEntry {
+  final int rank;
+  final String username;
+  final int currentLevel;
+  final int streakDays;
+  final int xpPoints;
+  final int completedLessons;
+  final bool isCurrentUser;
+
+  const LeaderboardEntry({
+    required this.rank,
+    required this.username,
+    required this.currentLevel,
+    required this.streakDays,
+    required this.xpPoints,
+    required this.completedLessons,
+    this.isCurrentUser = false,
+  });
+
+  factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
+    return LeaderboardEntry(
+      rank: (json['rank'] as num?)?.toInt() ?? 0,
+      username: json['username'] as String? ?? 'Développeur',
+      currentLevel: (json['currentLevel'] as num?)?.toInt() ?? 1,
+      streakDays: (json['streakDays'] as num?)?.toInt() ?? 0,
+      xpPoints: (json['xpPoints'] as num?)?.toInt() ?? 0,
+      completedLessons: (json['completedLessons'] as num?)?.toInt() ?? 0,
+      isCurrentUser: json['isCurrentUser'] as bool? ?? false,
+    );
+  }
+}
+
+class LeaderboardData {
+  final String period;
+  final int totalParticipants;
+  final LeaderboardEntry? currentUserEntry;
+  final List<LeaderboardEntry> entries;
+
+  const LeaderboardData({
+    required this.period,
+    required this.totalParticipants,
+    this.currentUserEntry,
+    required this.entries,
+  });
+
+  factory LeaderboardData.fromJson(Map<String, dynamic> json) {
+    return LeaderboardData(
+      period: json['period'] as String? ?? 'WEEKLY',
+      totalParticipants: (json['totalParticipants'] as num?)?.toInt() ?? 0,
+      currentUserEntry: json['currentUserEntry'] != null
+          ? LeaderboardEntry.fromJson(
+              json['currentUserEntry'] as Map<String, dynamic>,
+            )
+          : null,
+      entries: (json['entries'] as List<dynamic>? ?? [])
+          .map((e) => LeaderboardEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}

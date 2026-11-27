@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/storage/local_database.dart';
 import '../../../core/theme/app_theme.dart';
@@ -199,6 +200,42 @@ class ProgressScreen extends ConsumerWidget {
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            SurfaceCard(
+                              onTap: () => context.push('/leaderboard'),
+                              child: Row(
+                                children: [
+                                  const IconTile(
+                                    icon: LucideIcons.trophy,
+                                    color: AppColors.brand,
+                                    size: 42,
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Classement communautaire',
+                                          style: context.text.titleSmall,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Comparez votre progression de la semaine et globale.',
+                                          style: context.text.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    LucideIcons.chevronRight,
+                                    size: 18,
+                                    color: context.palette.textMuted,
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: AppSpacing.lg),
                             const SectionHeader(
