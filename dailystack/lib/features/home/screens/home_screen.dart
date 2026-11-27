@@ -675,15 +675,23 @@ class _Greeting extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (levelBadge != null) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        levelBadge,
-                        style: context.text.labelSmall?.copyWith(
-                          color: AppColors.brand,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 3),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            levelBadge,
+                            style: context.text.labelSmall?.copyWith(
+                              color: AppColors.brand,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const _LeaderboardRankPill(),
+                        ],
                       ),
                     ],
                   ],
@@ -721,6 +729,73 @@ class _Greeting extends ConsumerWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LeaderboardRankPill extends ConsumerStatefulWidget {
+  const _LeaderboardRankPill();
+
+  @override
+  ConsumerState<_LeaderboardRankPill> createState() =>
+      _LeaderboardRankPillState();
+}
+
+class _LeaderboardRankPillState extends ConsumerState<_LeaderboardRankPill> {
+  LeaderboardEntry? _entry;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRank();
+  }
+
+  Future<void> _loadRank() async {
+    try {
+      final data = await ref
+          .read(practiceServiceProvider)
+          .getLeaderboard(period: 'WEEKLY', limit: 1);
+      if (!mounted || data.currentUserEntry == null) return;
+      setState(() => _entry = data.currentUserEntry);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = _entry;
+    if (entry == null) {
+      return const SizedBox.shrink();
+    }
+    return InkWell(
+      onTap: () => context.push('/leaderboard'),
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: context.palette.surfaceAlt,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(color: context.palette.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              LucideIcons.trophy,
+              size: 12,
+              color: AppColors.brandBright,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '#${entry.rank} · ${entry.xpPoints} XP',
+              style: AppTheme.monoStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: context.colors.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

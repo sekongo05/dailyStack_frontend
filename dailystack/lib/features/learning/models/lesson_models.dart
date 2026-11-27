@@ -174,6 +174,8 @@ class LessonDetail {
   final String? curriculumCode;
   final String domainCode;
   final String title;
+  final String? prerequisites;
+  final String? keywords;
   final int estimatedMinutes;
   final int sequenceDay;
   final bool revisionDay;
@@ -188,6 +190,8 @@ class LessonDetail {
     this.curriculumCode,
     required this.domainCode,
     required this.title,
+    this.prerequisites,
+    this.keywords,
     required this.estimatedMinutes,
     required this.sequenceDay,
     required this.revisionDay,
@@ -204,6 +208,8 @@ class LessonDetail {
       curriculumCode: json['curriculumCode'] as String?,
       domainCode: json['domainCode'] as String,
       title: json['title'] as String,
+      prerequisites: json['prerequisites'] as String?,
+      keywords: json['keywords'] as String?,
       estimatedMinutes: json['estimatedMinutes'] as int? ?? 5,
       sequenceDay: json['sequenceDay'] as int? ?? 1,
       revisionDay: json['revisionDay'] as bool? ?? false,
@@ -224,6 +230,8 @@ class LessonDetail {
         if (curriculumCode != null) 'curriculumCode': curriculumCode,
         'domainCode': domainCode,
         'title': title,
+        if (prerequisites != null) 'prerequisites': prerequisites,
+        if (keywords != null) 'keywords': keywords,
         'estimatedMinutes': estimatedMinutes,
         'sequenceDay': sequenceDay,
         'revisionDay': revisionDay,

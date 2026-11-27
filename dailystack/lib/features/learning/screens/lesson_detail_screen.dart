@@ -280,8 +280,9 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
 
   MarkdownStyleSheet _markdownStyle(BuildContext context, Color accentColor) {
     return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-      p: context.text.bodyLarge?.copyWith(height: 1.62),
-      pPadding: const EdgeInsets.only(bottom: 10),
+      p: context.text.bodyLarge?.copyWith(height: 1.65),
+      pPadding: const EdgeInsets.only(bottom: 12),
+      blockSpacing: 14,
       h1: context.text.headlineMedium,
       h2: context.text.headlineSmall,
       h3: context.text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -752,6 +753,39 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
         ),
         const SizedBox(height: AppSpacing.md),
         Text(lesson.title, style: context.text.headlineMedium),
+        if (lesson.prerequisites != null &&
+            lesson.prerequisites!.trim().isNotEmpty &&
+            lesson.prerequisites!.trim().toLowerCase() != 'aucun') ...[
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm + 4,
+              vertical: AppSpacing.xs + 4,
+            ),
+            decoration: BoxDecoration(
+              color: context.palette.surfaceAlt,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: context.palette.border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.account_tree_outlined,
+                  size: 16,
+                  color: context.palette.textMuted,
+                ),
+                const SizedBox(width: AppSpacing.xs + 4),
+                Expanded(
+                  child: Text(
+                    'Prérequis : ${lesson.prerequisites!.trim()}',
+                    style: context.text.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
