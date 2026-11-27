@@ -25,17 +25,37 @@ messaging.onBackgroundMessage((payload) => {
   return self.registration.showNotification(title, options);
 });
 
+function resolveTargetUrl(notification) {
+  const data = (notification && notification.data) || {};
+  const fcmData = (data.FCM_MSG && data.FCM_MSG.data) || {};
+  const rawRoute = data.targetRoute || fcmData.targetRoute || '';
+  const route = typeof rawRoute === 'string' ? rawRoute.trim() : '';
+  if (!route || !route.startsWith('/')) {
+    return '/';
+  }
+  return '/#' + route;
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const targetUrl = resolveTargetUrl(event.notification);
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
+        if ('navigate' in client && targetUrl !== '/') {
+          return client.navigate(targetUrl).then((navigated) => {
+            if (navigated && 'focus' in navigated) {
+              return navigated.focus();
+            }
+            return 'focus' in client ? client.focus() : undefined;
+          });
+        }
         if ('focus' in client) {
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow('/');
+        return clients.openWindow(targetUrl);
       }
     })
   );
