@@ -14,6 +14,7 @@ import '../../../core/widgets/ui.dart';
 import '../../learning/models/lesson_models.dart';
 import '../../learning/services/lesson_service.dart';
 import '../../notifications/screens/notifications_screen.dart';
+import '../../notifications/widgets/notification_opt_in_card.dart';
 import '../../practice/models/practice_models.dart';
 import '../../watch/models/news_models.dart';
 
@@ -280,6 +281,7 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   const SizedBox(height: AppSpacing.sm),
                   const PwaInstallBanner(),
+                  const NotificationOptInCard(),
                   if (tomorrowPreview != null &&
                       MediaQuery.sizeOf(context).width >= 840)
                     IntrinsicHeight(

@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../../core/widgets/ui.dart';
 import '../models/notification_models.dart';
+import '../widgets/notification_opt_in_card.dart';
 
 final notificationsListProvider =
     FutureProvider.autoDispose<List<DailyNotificationItem>>((ref) async {
@@ -72,10 +73,25 @@ class NotificationsScreen extends ConsumerWidget {
         ),
         data: (items) {
           if (items.isEmpty) {
-            return const AppEmptyView(
-              icon: Icons.notifications_none_rounded,
-              title: 'Aucune notification',
-              subtitle: 'Vous recevrez ici vos rappels quotidiens.',
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.xl,
+              ),
+              children: const [
+                NotificationOptInCard(
+                  dismissible: false,
+                  showWhenDenied: true,
+                ),
+                SizedBox(height: AppSpacing.lg),
+                AppEmptyView(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Aucune notification',
+                  subtitle: 'Vous recevrez ici vos rappels quotidiens.',
+                ),
+              ],
             );
           }
           return RefreshIndicator(
@@ -87,10 +103,16 @@ class NotificationsScreen extends ConsumerWidget {
                 AppSpacing.md,
                 AppSpacing.xl,
               ),
-              itemCount: items.length,
+              itemCount: items.length + 1,
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
-                final item = items[index];
+                if (index == 0) {
+                  return const NotificationOptInCard(
+                    dismissible: false,
+                    showWhenDenied: true,
+                  );
+                }
+                final item = items[index - 1];
                 final isUnread = !item.read;
                 return SurfaceCard(
                   borderColor: isUnread
