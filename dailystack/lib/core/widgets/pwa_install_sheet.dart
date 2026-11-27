@@ -151,7 +151,7 @@ class _PwaInstallGuideSheetState extends State<_PwaInstallGuideSheet> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Expérience native sans barre d\'adresse et cache hors-ligne.',
+                        'Ouvrez l\'application en plein écran, même sans connexion internet.',
                         style: context.text.bodySmall,
                       ),
                     ],

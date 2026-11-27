@@ -446,7 +446,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         color: AppColors.brand,
                                         size: 38,
                                       ),
-                                      title: const Text('Alertes navigateur (PWA)'),
+                                      title: const Text('Notifications sur cet appareil'),
                                       subtitle: Text(
                                         webNotificationPermission == 'granted'
                                             ? 'Autorisées sur cet appareil'
@@ -488,16 +488,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         }
                                         if (!mounted) return;
                                         setState(() {});
+                                        final feedback = registered
+                                            ? 'Notifications activées sur cet appareil !'
+                                            : status == 'granted'
+                                                ? 'Notifications activées !'
+                                                : status == 'denied'
+                                                    ? 'Notifications bloquées dans les réglages de votre navigateur.'
+                                                    : 'Autorisation des notifications en attente.';
                                         messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              registered
-                                                  ? 'Alertes navigateur et Push activés sur cet appareil !'
-                                                  : status == 'granted'
-                                                      ? 'Alertes navigateur activées !'
-                                                      : 'Permission notifications : $status',
-                                            ),
-                                          ),
+                                          SnackBar(content: Text(feedback)),
                                         );
                                       },
                                     ),

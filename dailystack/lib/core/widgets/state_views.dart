@@ -125,7 +125,7 @@ class OfflineBanner extends StatelessWidget {
             ? (pendingCount > 0
                 ? 'Données stockées localement - en attente de synchronisation ($pendingCount)'
                 : 'Données stockées localement - en attente de synchronisation')
-            : 'Mode hors ligne • Contenu en cache disponible')
+            : 'Mode hors ligne • Vos leçons enregistrées restent disponibles')
         : (isSyncing
             ? 'Synchronisation de $pendingCount action(s) en cours…'
             : '$pendingCount action(s) en attente de synchronisation');
