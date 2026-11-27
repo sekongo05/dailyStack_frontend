@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/state_views.dart';
@@ -137,11 +138,11 @@ class _MainShell extends ConsumerWidget {
   const _MainShell({required this.navigationShell});
 
   static const _destinations = [
-    (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Accueil'),
-    (icon: Icons.auto_stories_outlined, selectedIcon: Icons.auto_stories_rounded, label: 'Apprendre'),
-    (icon: Icons.bolt_outlined, selectedIcon: Icons.bolt_rounded, label: 'Veille'),
-    (icon: Icons.bar_chart_outlined, selectedIcon: Icons.bar_chart_rounded, label: 'Progrès'),
-    (icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Profil'),
+    (icon: LucideIcons.house, selectedIcon: LucideIcons.house, label: 'Accueil'),
+    (icon: LucideIcons.bookOpen, selectedIcon: LucideIcons.bookOpen, label: 'Apprendre'),
+    (icon: LucideIcons.zap, selectedIcon: LucideIcons.zap, label: 'Veille'),
+    (icon: LucideIcons.trendingUp, selectedIcon: LucideIcons.trendingUp, label: 'Progrès'),
+    (icon: LucideIcons.user, selectedIcon: LucideIcons.user, label: 'Profil'),
   ];
 
   void _onSelect(int index) {

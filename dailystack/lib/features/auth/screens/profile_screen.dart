@@ -574,12 +574,8 @@ class _UserHeaderCard extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.brand, AppColors.brandDark],
-              ),
-              borderRadius: BorderRadius.circular(18),
+              color: AppColors.brand,
+              borderRadius: BorderRadius.circular(AppRadius.md + 2),
             ),
             alignment: Alignment.center,
             child: Text(

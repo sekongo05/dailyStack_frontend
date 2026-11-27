@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
@@ -156,7 +157,7 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               onPressed: () => _shareArticle(detail),
               tooltip: 'Partager',
-              icon: const Icon(Icons.share_outlined),
+              icon: const Icon(LucideIcons.share2, size: 19),
             ),
             IconButton(
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
@@ -165,9 +166,8 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
                   ? 'Retirer des favoris'
                   : 'Ajouter aux favoris',
               icon: Icon(
-                detail.bookmarked
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_outline_rounded,
+                LucideIcons.bookmark,
+                size: 19,
                 color: detail.bookmarked ? AppColors.brand : null,
               ),
             ),

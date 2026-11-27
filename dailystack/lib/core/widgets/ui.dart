@@ -184,7 +184,14 @@ class StatTile extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(value, style: context.text.headlineSmall),
+            child: Text(
+              value,
+              style: AppTheme.monoStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.w700,
+                color: context.colors.onSurface,
+              ),
+            ),
           ),
           const SizedBox(height: 2),
           Text(
@@ -347,22 +354,11 @@ class AppLogo extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           borderRadius: radius,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0F172A), Color(0xFF080D1A)],
-          ),
+          color: AppColors.darkSurface,
           border: Border.all(
-            color: AppColors.brandBright.withValues(alpha: 0.35),
+            color: AppColors.darkBorder,
             width: 1.2,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.brand.withValues(alpha: 0.28),
-              blurRadius: size * 0.32,
-              offset: Offset(0, size * 0.1),
-            ),
-          ],
         ),
         child: ClipRRect(
           borderRadius: radius,
@@ -398,31 +394,28 @@ class _StackLogoPainter extends CustomPainter {
       canvas.drawPath(path, paint);
     }
 
-    // Couche inférieure (socle bleu nuit / cyan discret)
+    // Couche inférieure (socle sobre)
     drawLayer(
       topY: h * 0.50,
       halfW: w * 0.30,
       halfH: h * 0.13,
-      paint: Paint()..color = const Color(0xFF0EA5E9).withValues(alpha: 0.38),
+      paint: Paint()..color = AppColors.brandDark.withValues(alpha: 0.65),
     );
 
-    // Couche intermédiaire (cyan électrique)
+    // Couche intermédiaire (indigo vif)
     drawLayer(
       topY: h * 0.36,
       halfW: w * 0.30,
       halfH: h * 0.13,
-      paint: Paint()..color = const Color(0xFF06B6D4).withValues(alpha: 0.78),
+      paint: Paint()..color = AppColors.brandBright,
     );
 
-    // Couche supérieure (dégradé cyan -> émeraude)
+    // Couche supérieure (aplat net émeraude/indigo clair)
     drawLayer(
       topY: h * 0.22,
       halfW: w * 0.30,
       halfH: h * 0.13,
-      paint: Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF22D3EE), Color(0xFF10B981)],
-        ).createShader(Rect.fromLTWH(w * 0.2, h * 0.2, w * 0.6, h * 0.3)),
+      paint: Paint()..color = const Color(0xFFA5B4FC),
     );
   }
 

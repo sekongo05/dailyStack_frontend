@@ -21,11 +21,7 @@ class AuthLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isCompact = MediaQuery.sizeOf(context).width < 480;
-    final glowColor = isDark
-        ? AppColors.brandBright.withValues(alpha: 0.14)
-        : AppColors.brand.withValues(alpha: 0.09);
 
     return Scaffold(
       appBar: leadingAction != null
@@ -36,17 +32,6 @@ class AuthLayout extends StatelessWidget {
           : null,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -0.85),
-                  radius: 1.1,
-                  colors: [glowColor, Colors.transparent],
-                ),
-              ),
-            ),
-          ),
           SafeArea(
             child: Center(
               child: SingleChildScrollView(

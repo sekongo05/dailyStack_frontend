@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_views.dart';
@@ -284,7 +285,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               onSubmitted: (_) => _loadNews(),
               decoration: InputDecoration(
                 hintText: 'Rechercher une technologie, un mot-clé...',
-                prefixIcon: const Icon(Icons.search_rounded),
+                prefixIcon: const Icon(LucideIcons.search, size: 18),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         constraints: const BoxConstraints(
@@ -292,7 +293,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                           minHeight: 44,
                         ),
                         tooltip: 'Effacer la recherche',
-                        icon: const Icon(Icons.clear_rounded),
+                        icon: const Icon(LucideIcons.x, size: 18),
                         onPressed: () {
                           _searchDebounce?.cancel();
                           _searchController.clear();
@@ -397,10 +398,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         children: [
           FilterChip(
             avatar: Icon(
-              _onlyBookmarks
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_outline_rounded,
-              size: 16,
+              LucideIcons.bookmark,
+              size: 15,
+              color: _onlyBookmarks ? AppColors.brand : null,
             ),
             label: const Text('Favoris'),
             selected: _onlyBookmarks,
@@ -415,8 +415,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           const SizedBox(width: AppSpacing.sm),
           FilterChip(
             avatar: Icon(
-              Icons.bolt_rounded,
-              size: 16,
+              LucideIcons.zap,
+              size: 15,
               color: _onlyImportant ? AppColors.warning : null,
             ),
             label: const Text('Importantes'),
@@ -522,9 +522,8 @@ class _NewsCard extends StatelessWidget {
                     ? 'Retirer des favoris'
                     : 'Ajouter aux favoris',
                 icon: Icon(
-                  item.bookmarked
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_outline_rounded,
+                  LucideIcons.bookmark,
+                  size: 18,
                   color: item.bookmarked
                       ? AppColors.brand
                       : context.palette.textMuted,

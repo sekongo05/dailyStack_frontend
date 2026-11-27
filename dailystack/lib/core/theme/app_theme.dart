@@ -1,41 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Couleurs de marque et sémantiques, indépendantes du mode clair/sombre.
+/// Couleurs de marque et sémantiques (Option A : Studio Charbon & Indigo).
 class AppColors {
   AppColors._();
 
-  // Marque (Tech Pro : Bleu Nuit + Cyan / Émeraude)
-  static const Color brand = Color(0xFF0891B2);
-  static const Color brandBright = Color(0xFF22D3EE);
-  static const Color brandDark = Color(0xFF0E7490);
-  static const Color brandSoft = Color(0xFFE0F7FA);
+  // Marque (Indigo franc, zéro néon)
+  static const Color brand = Color(0xFF4F46E5);
+  static const Color brandBright = Color(0xFF6366F1);
+  static const Color brandDark = Color(0xFF4338CA);
+  static const Color brandSoft = Color(0xFFEEF2FF);
 
   // Domaines
-  static const Color backend = Color(0xFF10B981);
-  static const Color devops = Color(0xFF0EA5E9);
+  static const Color backend = Color(0xFF059669);
+  static const Color devops = Color(0xFF0284C7);
 
   // Sémantiques
-  static const Color success = Color(0xFF10B981);
-  static const Color error = Color(0xFFEF4444);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color streak = Color(0xFFF97316);
+  static const Color success = Color(0xFF059669);
+  static const Color error = Color(0xFFDC2626);
+  static const Color warning = Color(0xFFD97706);
+  static const Color streak = Color(0xFFEA580C);
 
-  // Neutres clairs (frais & contrastés, esprit Vercel)
-  static const Color lightBackground = Color(0xFFF8FAFC);
+  // Neutres clairs (Zinc neutre, net et contrasté)
+  static const Color lightBackground = Color(0xFFFAFAFA);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceAlt = Color(0xFFF1F5F9);
-  static const Color lightTextPrimary = Color(0xFF0F172A);
-  static const Color lightTextSecondary = Color(0xFF475569);
-  static const Color lightBorder = Color(0xFFE2E8F0);
+  static const Color lightSurfaceAlt = Color(0xFFF4F4F5);
+  static const Color lightTextPrimary = Color(0xFF09090B);
+  static const Color lightTextSecondary = Color(0xFF71717A);
+  static const Color lightBorder = Color(0xFFE4E4E7);
 
-  // Neutres sombres (bleu nuit profond, esprit Linear)
-  static const Color darkBackground = Color(0xFF080D1A);
-  static const Color darkSurface = Color(0xFF0F172A);
-  static const Color darkSurfaceAlt = Color(0xFF162033);
-  static const Color darkTextPrimary = Color(0xFFF8FAFC);
-  static const Color darkTextSecondary = Color(0xFF94A3B8);
-  static const Color darkBorder = Color(0xFF1E293B);
+  // Neutres sombres (Charbon pur, esprit Linear / Vercel)
+  static const Color darkBackground = Color(0xFF09090B);
+  static const Color darkSurface = Color(0xFF121215);
+  static const Color darkSurfaceAlt = Color(0xFF1C1C21);
+  static const Color darkTextPrimary = Color(0xFFFAFAFA);
+  static const Color darkTextSecondary = Color(0xFFA1A1AA);
+  static const Color darkBorder = Color(0xFF27272A);
 }
 
 class AppSpacing {
@@ -52,9 +52,9 @@ class AppSpacing {
 class AppRadius {
   AppRadius._();
 
-  static const double sm = 10.0;
-  static const double md = 14.0;
-  static const double lg = 20.0;
+  static const double sm = 8.0;
+  static const double md = 12.0;
+  static const double lg = 16.0;
   static const double pill = 999.0;
 }
 
@@ -139,11 +139,12 @@ class AppTheme {
     required AppPalette palette,
   }) {
     final isDark = brightness == Brightness.dark;
+    final activeBrand = isDark ? AppColors.brandBright : AppColors.brand;
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.brand,
       brightness: brightness,
     ).copyWith(
-      primary: AppColors.brand,
+      primary: activeBrand,
       onPrimary: Colors.white,
       surface: surface,
       onSurface: textPrimary,
@@ -330,10 +331,23 @@ class AppTheme {
     );
   }
 
+  static TextStyle monoStyle({
+    double fontSize = 13,
+    FontWeight fontWeight = FontWeight.w600,
+    Color? color,
+  }) {
+    return GoogleFonts.jetBrainsMono(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+  }
+
   static TextTheme _textTheme(Color primary, Color muted) {
-    final base = GoogleFonts.plusJakartaSansTextTheme();
+    final base = GoogleFonts.interTextTheme();
     TextStyle? s(TextStyle? style, double size, FontWeight weight,
-            {double height = 1.3, double spacing = 0, Color? color}) =>
+            {double height = 1.35, double spacing = 0, Color? color}) =>
         style?.copyWith(
           fontSize: size,
           fontWeight: weight,
@@ -342,18 +356,28 @@ class AppTheme {
           color: color ?? primary,
         );
 
+    TextStyle heading(double size, FontWeight weight,
+            {double height = 1.18, double spacing = -0.4}) =>
+        GoogleFonts.spaceGrotesk(
+          fontSize: size,
+          fontWeight: weight,
+          height: height,
+          letterSpacing: spacing,
+          color: primary,
+        );
+
     return base.copyWith(
-      displaySmall: s(base.displaySmall, 34, FontWeight.w800, height: 1.15, spacing: -1),
-      headlineLarge: s(base.headlineLarge, 30, FontWeight.w800, height: 1.15, spacing: -0.8),
-      headlineMedium: s(base.headlineMedium, 26, FontWeight.w800, height: 1.2, spacing: -0.6),
-      headlineSmall: s(base.headlineSmall, 22, FontWeight.w800, height: 1.25, spacing: -0.4),
-      titleLarge: s(base.titleLarge, 19, FontWeight.w700, spacing: -0.2),
-      titleMedium: s(base.titleMedium, 16, FontWeight.w700),
-      titleSmall: s(base.titleSmall, 14, FontWeight.w700),
-      bodyLarge: s(base.bodyLarge, 16, FontWeight.w400, height: 1.6),
+      displaySmall: heading(34, FontWeight.w700, height: 1.12, spacing: -1.0),
+      headlineLarge: heading(30, FontWeight.w700, height: 1.15, spacing: -0.8),
+      headlineMedium: heading(26, FontWeight.w700, height: 1.18, spacing: -0.6),
+      headlineSmall: heading(22, FontWeight.w700, height: 1.22, spacing: -0.4),
+      titleLarge: heading(19, FontWeight.w700, height: 1.25, spacing: -0.2),
+      titleMedium: s(base.titleMedium, 16, FontWeight.w600, spacing: -0.1),
+      titleSmall: s(base.titleSmall, 14, FontWeight.w600),
+      bodyLarge: s(base.bodyLarge, 15.5, FontWeight.w400, height: 1.6),
       bodyMedium: s(base.bodyMedium, 14.5, FontWeight.w400, height: 1.5),
       bodySmall: s(base.bodySmall, 13, FontWeight.w500, height: 1.45, color: muted),
-      labelLarge: s(base.labelLarge, 15, FontWeight.w700),
+      labelLarge: s(base.labelLarge, 14.5, FontWeight.w600),
       labelMedium: s(base.labelMedium, 13, FontWeight.w600),
       labelSmall: s(base.labelSmall, 11.5, FontWeight.w600, spacing: 0.2),
     );

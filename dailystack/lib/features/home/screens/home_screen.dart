@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/notifications/web_notification_helper.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/storage/local_database.dart';
@@ -636,19 +637,15 @@ class _Greeting extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.brand, AppColors.brandDark],
-                    ),
-                    borderRadius: BorderRadius.circular(13),
+                    color: AppColors.brand,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     initial,
                     style: context.text.titleMedium?.copyWith(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -896,15 +893,12 @@ class _TodayLessonHero extends StatelessWidget {
     final isCompleted = lesson.status == LessonProgressStatus.COMPLETED;
     final isBackend = DomainBadge.isBackend(lesson.domainCode);
     final accentColor = isBackend ? AppColors.backend : AppColors.devops;
-    final gradientColors = isBackend
-        ? const [Color(0xFF0F172A), Color(0xFF0A2E26)]
-        : const [Color(0xFF0F172A), Color(0xFF0A273D)];
     final progressPercent =
         (lesson.scrollOffsetRatio.clamp(0.0, 1.0) * 100).round();
 
     final (ctaLabel, ctaIcon) = isInProgress
-        ? ('Continuer ($progressPercent%)', Icons.play_arrow_rounded)
-        : ('Commencer', Icons.arrow_forward_rounded);
+        ? ('Continuer ($progressPercent%)', LucideIcons.play)
+        : ('Commencer', LucideIcons.arrowRight);
     final statusLabel = isCompleted
         ? 'Terminée aujourd\'hui'
         : isInProgress
@@ -922,46 +916,16 @@ class _TodayLessonHero extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.lg + 4),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradientColors,
-        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        color: AppColors.darkSurface,
         border: Border.all(
           color: accentColor.withValues(alpha: 0.45),
           width: 1.2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withValues(alpha: 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          Positioned(
-            right: -36,
-            top: -36,
-            child: IgnorePointer(
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      accentColor.withValues(alpha: 0.24),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
           Padding(
             padding: EdgeInsets.all(
               isCompact ? AppSpacing.md : AppSpacing.lg - 4,

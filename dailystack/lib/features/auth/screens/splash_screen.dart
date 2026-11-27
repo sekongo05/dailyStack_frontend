@@ -66,20 +66,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       backgroundColor: AppColors.darkBackground,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -0.2),
-                  radius: 0.9,
-                  colors: [
-                    AppColors.brandBright.withValues(alpha: 0.16),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
