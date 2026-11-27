@@ -102,7 +102,11 @@ class NotificationsScreen extends ConsumerWidget {
                       } catch (_) {}
                     }
                     if (context.mounted) {
-                      await context.push('/lessons/${item.lessonId}');
+                      if (item.lessonId > 0) {
+                        await context.push('/lessons/${item.lessonId}');
+                      } else {
+                        context.go('/watch');
+                      }
                     }
                   },
                   child: Row(
